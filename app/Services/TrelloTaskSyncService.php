@@ -65,8 +65,22 @@ class TrelloTaskSyncService
         $lists = collect($this->trello->getLists($boardId, $integration))
             ->keyBy(fn (array $list) => (string) ($list['id'] ?? ''));
 
+        $linkedProgramsCount = TrelloInternshipLink::query()
+            ->where('trello_integration_id', $integration->id)
+            ->count();
+        $linkedListIds = TrelloInternshipLink::query()
+            ->where('trello_integration_id', $integration->id)
+            ->pluck('trello_list_id')
+            ->map(fn ($id) => (string) $id)
+            ->filter()
+            ->values();
+        $defaultLinkId = TrelloInternshipLink::query()
+            ->where('trello_integration_id', $integration->id)
+            ->orderBy('id')
+            ->value('id');
+
         $cards = collect($this->trello->getBoardCards($boardId, $integration))
-            ->filter(function (array $card) use ($link, $existingCardIds) {
+            ->filter(function (array $card) use ($link, $existingCardIds, $linkedProgramsCount, $linkedListIds, $defaultLinkId) {
                 $cardId = (string) ($card['id'] ?? '');
                 $listId = (string) ($card['idList'] ?? '');
 
@@ -74,7 +88,19 @@ class TrelloTaskSyncService
                     return false;
                 }
 
-                return $listId === (string) $link->trello_list_id || in_array($cardId, $existingCardIds, true);
+                if (in_array($cardId, $existingCardIds, true)) {
+                    return true;
+                }
+
+                if ($linkedProgramsCount <= 1) {
+                    return true;
+                }
+
+                if ($listId === (string) $link->trello_list_id) {
+                    return true;
+                }
+
+                return ! $linkedListIds->contains($listId) && (int) $link->id === (int) $defaultLinkId;
             })
             ->values();
 
@@ -107,6 +133,7 @@ class TrelloTaskSyncService
                 foreach ($targetApplications as $application) {
                     $cardId = (string) ($card['id'] ?? '');
                     $cardName = trim((string) ($card['name'] ?? ''));
+                    $cardName = preg_replace('/^\[\d+\s*\/\s*\d+\]\s*/', '', $cardName) ?: $cardName;
                     if ($cardId === '' || $cardName === '') {
                         $counts['skipped']++;
                         continue;
@@ -120,6 +147,8 @@ class TrelloTaskSyncService
 
                     $isNew = ! $task->exists;
                     $task->fill([
+                        'application_id' => $application->id,
+                        'training_id' => (int) $link->opportunity_id,
                         'company_user_id' => $integration->company_user_id,
                         'trello_integration_id' => $integration->id,
                         'created_by' => $task->created_by ?: $integration->company_user_id,
@@ -199,7 +228,7 @@ class TrelloTaskSyncService
 
     private function resolveDefaultApplicationsFromLink(Collection $applications, ?TrelloInternshipLink $link): Collection
     {
-        $mode = (string) ($link?->assignment_mode ?? 'marker_required');
+        $mode = (string) ($link?->assignment_mode ?? 'all');
         if ($mode === 'all') {
             return $applications->values();
         }
@@ -219,7 +248,7 @@ class TrelloTaskSyncService
                 ->values();
         }
 
-        return collect();
+        return $applications->values();
     }
 
     private function extractStudentMarkers(array $card): Collection

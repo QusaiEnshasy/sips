@@ -51,7 +51,7 @@
             <div class="col-6"><span class="text-muted">Field:</span> {{ program.field || '-' }}</div>
             <div class="col-6"><span class="text-muted">City:</span> {{ program.city || '-' }}</div>
             <div class="col-6"><span class="text-muted">Work:</span> {{ program.work_type || '-' }}</div>
-            <div class="col-6"><span class="text-muted">Duration:</span> {{ program.duration || 0 }} month(s)</div>
+            <div class="col-6"><span class="text-muted">Duration:</span> {{ program.duration || 0 }} week(s)</div>
           </div>
 
           <router-link :to="`/student/program/${program.id}`" class="btn btn-primary rounded-pill">

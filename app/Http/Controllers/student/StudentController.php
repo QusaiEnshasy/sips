@@ -24,16 +24,45 @@ class StudentController extends Controller
 
     private function calculateProgress(Application $application): int
     {
-        if (! $application->approved_at || ! $application->opportunity || ! $application->opportunity->duration) {
-            return 0;
-        }
-
         if ($application->training_completed_at) {
             return 100;
         }
 
+        $studentId = (int) $application->student_id;
+        if ($studentId > 0) {
+            $assignedTasks = Task::query()
+                ->where('application_id', $application->id)
+                ->whereHas('assignedStudents', function ($query) use ($studentId) {
+                    $query->where('users.id', $studentId);
+                });
+
+            $totalTasks = (clone $assignedTasks)->count();
+            if ($totalTasks > 0) {
+                $completedTasks = (clone $assignedTasks)
+                    ->where(function ($query) {
+                        $query->where('status', 'done')
+                            ->orWhere(function ($nested) {
+                                $nested->whereNotNull('student_solution')
+                                    ->where('student_solution', '!=', '');
+                            });
+                    })
+                    ->count();
+
+                return (int) min(100, max(0, round(($completedTasks / $totalTasks) * 100)));
+            }
+        }
+
+        return $this->calculateTimeProgress($application);
+    }
+
+    private function calculateTimeProgress(Application $application): int
+    {
+        if (! $application->approved_at || ! $application->opportunity || ! $application->opportunity->duration) {
+            return 0;
+        }
+
         $start = Carbon::parse($application->approved_at);
-        $end = Carbon::parse($application->approved_at)->addMonths((int) $application->opportunity->duration);
+        $end = Carbon::parse($application->approved_at)->addWeeks((int) $application->opportunity->duration);
         $now = now();
 
         if ($now->lessThanOrEqualTo($start)) {
@@ -88,11 +117,26 @@ class StudentController extends Controller
             $inProgressTasks = (clone $assignedTasks)->where('status', 'progress')->count();
 
             $weeklyTasks = collect();
+            $activeTotalTasks = 0;
+            $activeCompletedTasks = 0;
             if ($activeTraining) {
-                $weeklyTasks = Task::where('application_id', $activeTraining->id)
+                $activeAssignedTasks = Task::where('application_id', $activeTraining->id)
                     ->whereHas('assignedStudents', function ($query) use ($student) {
                         $query->where('users.id', $student->id);
+                    });
+
+                $activeTotalTasks = (clone $activeAssignedTasks)->count();
+                $activeCompletedTasks = (clone $activeAssignedTasks)
+                    ->where(function ($query) {
+                        $query->where('status', 'done')
+                            ->orWhere(function ($nested) {
+                                $nested->whereNotNull('student_solution')
+                                    ->where('student_solution', '!=', '');
+                            });
                     })
+                    ->count();
+
+                $weeklyTasks = (clone $activeAssignedTasks)
                     ->orderBy('due_date')
                     ->orderBy('id')
                     ->take(6)
@@ -149,6 +193,8 @@ class StudentController extends Controller
                         'company_name' => $activeTraining->opportunity?->companyUser?->company_name
                             ?: $activeTraining->opportunity?->companyUser?->name,
                         'progress' => $this->calculateProgress($activeTraining),
+                        'total_tasks' => $activeTotalTasks,
+                        'completed_tasks' => $activeCompletedTasks,
                         'board_url' => route('tasks.board', ['application' => $activeTraining->id]),
                         'workspace_url' => route('student.workspace.index'),
                     ] : null,
@@ -332,7 +378,7 @@ class StudentController extends Controller
 
         if ($activeApplication && $activeApplication->approved_at && $activeApplication->opportunity?->duration) {
             $this->trainingEvaluationNotifier->notifyIfTrainingEnded($activeApplication);
-            $trainingEndDate = $activeApplication->approved_at->copy()->addMonths((int) $activeApplication->opportunity->duration)->startOfDay();
+            $trainingEndDate = $activeApplication->approved_at->copy()->addWeeks((int) $activeApplication->opportunity->duration)->startOfDay();
             $trainingEnded = now()->startOfDay()->greaterThanOrEqualTo($trainingEndDate);
         }
 

@@ -23,12 +23,12 @@ class TrainingEvaluationNotifier
             return;
         }
 
-        $durationMonths = (int) ($application->opportunity?->duration ?? 0);
-        if ($durationMonths <= 0) {
+        $durationWeeks = (int) ($application->opportunity?->duration ?? 0);
+        if ($durationWeeks <= 0) {
             return;
         }
 
-        $endDate = $application->approved_at->copy()->addMonths($durationMonths)->startOfDay();
+        $endDate = $application->approved_at->copy()->addWeeks($durationWeeks)->startOfDay();
         if (now()->startOfDay()->lt($endDate)) {
             return;
         }

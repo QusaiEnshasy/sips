@@ -33,6 +33,9 @@ class TrelloService
     private function client()
     {
         return Http::acceptJson()
+            ->withOptions([
+                'verify' => (bool) config('services.trello.verify_ssl', true),
+            ])
             ->timeout(20)
             ->retry(2, 250, throw: false);
     }
@@ -240,6 +243,51 @@ class TrelloService
 
         return $this->post("/cards/{$cardId}/actions/comments", [
             'text' => $text,
+        ], $integration);
+    }
+
+    public function getCardChecklists(string $cardId, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $cardId === '') {
+            return [];
+        }
+
+        return $this->get("/cards/{$cardId}/checklists", [
+            'checkItems' => 'all',
+        ], $integration);
+    }
+
+    public function createChecklist(string $cardId, string $name, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $cardId === '' || trim($name) === '') {
+            return [];
+        }
+
+        return $this->post('/checklists', [
+            'idCard' => $cardId,
+            'name' => $name,
+        ], $integration);
+    }
+
+    public function createChecklistItem(string $checklistId, string $name, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $checklistId === '' || trim($name) === '') {
+            return [];
+        }
+
+        return $this->post("/checklists/{$checklistId}/checkItems", [
+            'name' => $name,
+        ], $integration);
+    }
+
+    public function updateChecklistItemState(string $cardId, string $checkItemId, bool $complete, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $cardId === '' || $checkItemId === '') {
+            return [];
+        }
+
+        return $this->put("/cards/{$cardId}/checkItem/{$checkItemId}", [
+            'state' => $complete ? 'complete' : 'incomplete',
         ], $integration);
     }
 

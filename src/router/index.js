@@ -164,7 +164,7 @@ const routes = [
   {
     path: '/student/workspace',
     name: 'TrainingWorkspace',
-    component: () => import('@/views/shared/TrainingTasksWorkspace.vue'),
+    component: () => import('@/views/student/TrainingWorkspace.vue'),
     meta: { requiresAuth: true, role: 'student' }
   },
   {

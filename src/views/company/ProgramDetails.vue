@@ -70,7 +70,7 @@
               </div>
               <div>
                 <p class="text-muted small mb-1">{{ t('start_date') }}</p>
-                <h4 class="fw-bold mb-0">{{ formatDate(program.start_date) }}</h4>
+                <h4 class="fw-bold mb-0">{{ program.start_date ? formatDate(program.start_date) : 'لم يبدأ بعد' }}</h4>
               </div>
             </div>
           </div>
@@ -225,7 +225,7 @@
               <div class="row g-3 mb-3">
                 <div class="col-md-6">
                   <label class="form-label fw-bold">{{ t('start_date') }}</label>
-                  <input type="date" class="form-control" v-model="editForm.start_date" required>
+                  <input type="text" class="form-control" :value="editForm.start_date ? formatDate(editForm.start_date) : 'يبدأ عند قبول أول طالب'" disabled>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label fw-bold">{{ t('end_date') }}</label>

@@ -16,6 +16,7 @@ export const trainingTasksAPI = {
   getWorkspace: () => webApi.get('/workspace/tasks'),
   createTask: (data) => webApi.post('/workspace/tasks', data),
   syncTasks: () => webApi.post('/workspace/tasks/sync'),
+  saveCompanyEvaluation: (applicationId, data) => webApi.post(`/workspace/applications/${applicationId}/company-evaluation`, data),
   submitTask: (taskId, data) => webApi.post(`/workspace/tasks/${taskId}/submit`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),

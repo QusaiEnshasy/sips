@@ -6,7 +6,7 @@
 
     <div v-else-if="error" class="alert alert-warning rounded-4">
       {{ error }}
-      <button class="btn btn-sm btn-outline-primary ms-2" @click="loadDashboard">Retry</button>
+      <button class="btn btn-sm btn-outline-primary ms-2" @click="loadDashboard">إعادة المحاولة</button>
     </div>
 
     <div v-else>
@@ -17,7 +17,8 @@
             {{ student.name }} <span v-if="student.student_id">| {{ student.student_id }}</span>
           </p>
         </div>
-        <div class="d-flex gap-2"><router-link class="btn btn-primary rounded-pill px-4" to="/student/browse-programs">
+        <div class="d-flex gap-2">
+          <router-link class="btn btn-primary rounded-pill px-4" to="/student/browse-programs">
             {{ t('browse_programs') }}
           </router-link>
         </div>
@@ -51,6 +52,9 @@
           <div class="progress-bar bg-success" :style="{ width: `${activeTraining.progress || 0}%` }"></div>
         </div>
         <div class="small text-muted mt-2">{{ t('progress') }}: {{ activeTraining.progress || 0 }}%</div>
+        <div v-if="activeTraining.total_tasks" class="small text-muted mt-1">
+          تم إنجاز {{ activeTraining.completed_tasks || 0 }} من {{ activeTraining.total_tasks }} مهام
+        </div>
       </div>
 
       <div class="content-card mb-4">
@@ -65,9 +69,9 @@
           <table class="table align-middle mb-0">
             <thead>
               <tr>
-                <th>Program</th>
-                <th>Company</th>
-                <th>Status</th>
+                <th>البرنامج</th>
+                <th>الشركة</th>
+                <th>الحالة</th>
               </tr>
             </thead>
             <tbody>
@@ -91,11 +95,11 @@
             <div class="task-row d-flex justify-content-between align-items-center">
               <div>
                 <div class="fw-semibold">{{ task.title }}</div>
-                <div class="small text-muted">{{ task.description || 'No details' }}</div>
+                <div class="small text-muted">{{ task.description || 'لا توجد تفاصيل' }}</div>
               </div>
               <div class="d-flex align-items-center gap-2">
                 <span class="badge" :class="statusClass(task.status)">{{ task.status }}</span>
-                <button class="btn btn-sm btn-outline-primary" @click="openBoard(task.board_url)">Board</button>
+                <button class="btn btn-sm btn-outline-primary" @click="openBoard(task.board_url)">لوحة المهام</button>
               </div>
             </div>
           </div>
@@ -112,7 +116,6 @@ import { useI18n } from '@/composables/useI18n'
 
 const isLoading = ref(false)
 const { t } = useI18n()
-const { showSuccess, showError, showWarning, showInfo, showConfirm } = useAlerts()
 const error = ref('')
 const student = ref({})
 const stats = ref({})
@@ -139,14 +142,6 @@ const openBoard = (url) => {
   window.location.href = url
 }
 
-const testAlert = async () => {
-  const result = await showConfirm('هل تريد رؤية مثال على التنبيهات الجميلة؟', 'تجربة التنبيهات')
-  if (result.isConfirmed) {
-    await showSuccess('تم بنجاح! هذا مثال على تنبيه نجاح جميل.', 'نجح!')
-    await showInfo('يمكنك استخدام أنواع مختلفة من التنبيهات في مشروعك.', 'معلومات')
-  }
-}
-
 const loadDashboard = async () => {
   isLoading.value = true
   error.value = ''
@@ -159,7 +154,7 @@ const loadDashboard = async () => {
     weeklyTasks.value = payload.weekly_tasks || []
     activeTraining.value = payload.active_training || null
   } catch (e) {
-    error.value = e?.response?.data?.message || 'Failed to load dashboard'
+    error.value = e?.response?.data?.message || 'تعذر تحميل لوحة الطالب'
   } finally {
     isLoading.value = false
   }
@@ -183,4 +178,3 @@ onMounted(loadDashboard)
   padding: 12px;
 }
 </style>
-

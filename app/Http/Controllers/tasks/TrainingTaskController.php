@@ -13,15 +13,18 @@ use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\TrainingEvaluationNotifier;
 use App\Services\TrelloService;
+use App\Services\TrelloTaskSyncService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TrainingTaskController extends Controller
 {
     public function __construct(
         private readonly TrelloService $trello,
+        private readonly TrelloTaskSyncService $trelloTaskSync,
         private readonly NotificationService $notifications,
         private readonly TrainingEvaluationNotifier $trainingEvaluationNotifier
     ) {
@@ -47,7 +50,13 @@ class TrainingTaskController extends Controller
     public function storeWorkspaceTask(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless(in_array($user->role, ['company', 'supervisor'], true), 403);
+        abort_unless(in_array($user->role, ['company', 'supervisor', 'student'], true), 403);
+
+        abort_if(
+            $user->role === 'company',
+            422,
+            'الشركة تنشئ المهام من Trello الحقيقي فقط، ثم تتم مزامنتها داخل النظام.'
+        );
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -256,6 +265,12 @@ class TrainingTaskController extends Controller
 
         $task->save();
 
+        if (in_array($request->user()->role, ['company', 'admin'], true)) {
+            $this->syncCompanyFinalScoreFromTaskGrades($application);
+        }
+
+        $trainingCompleted = $this->completeTrainingIfFinalScoresReady($application);
+
         if ($application->student_id) {
             $this->notifications->notifyUser(
                 userId: (int) $application->student_id,
@@ -270,6 +285,59 @@ class TrainingTaskController extends Controller
             'status' => 'success',
             'message' => 'تم حفظ التقييم.',
             'task' => $this->formatWorkspaceTask($task->fresh(['application.student', 'application.opportunity.companyUser', 'assignedStudents', 'attachments.user'])),
+            'training_completed' => $trainingCompleted,
+            'complete_url' => $trainingCompleted ? route('training.complete', $application->id) : null,
+        ]);
+    }
+
+    public function saveCompanyFinalEvaluation(Request $request, Application $application): JsonResponse
+    {
+        $application->load(['student', 'opportunity']);
+        $user = $request->user();
+
+        abort_unless($user && $user->role === 'company', 403);
+        abort_unless((int) optional($application->opportunity)->company_user_id === (int) $user->id, 403);
+        abort_unless(
+            $application->company_status === 'approved'
+                && $application->supervisor_status === 'approved'
+                && $application->final_status === 'approved',
+            422,
+            'لا يمكن تقييم الطالب قبل القبول النهائي.'
+        );
+        abort_if($application->training_completed_at, 422, 'تم إنهاء التدريب مسبقًا.');
+        abort_unless($this->isTrainingEnded($application), 422, 'لم تنتهِ مدة تدريب الطالب بعد.');
+
+        $validated = $request->validate([
+            'company_final_score' => ['required', 'integer', 'min:0', 'max:100'],
+            'company_final_note' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $application->forceFill([
+            'company_final_score' => (int) $validated['company_final_score'],
+            'company_final_note' => trim((string) $validated['company_final_note']),
+        ])->save();
+
+        $trainingCompleted = $this->completeTrainingIfFinalScoresReady($application);
+        $application->refresh();
+
+        if ($application->student_id) {
+            $this->notifications->notifyUser(
+                userId: (int) $application->student_id,
+                title: 'Company Final Evaluation Submitted',
+                description: 'تم حفظ تقييم الشركة النهائي لتدريبك.',
+                type: 'info',
+                meta: ['category' => 'evaluation', 'application_id' => $application->id]
+            );
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $trainingCompleted
+                ? 'تم حفظ تقييم الشركة واكتمال التدريب بنجاح.'
+                : 'تم حفظ تقييم الشركة، وبانتظار تقييم المشرف لإكمال النتيجة النهائية.',
+            'training_completed' => $trainingCompleted,
+            'complete_url' => $trainingCompleted ? route('training.complete', $application->id) : null,
+            'data' => $this->formatWorkspaceApplication($application->fresh(['student', 'opportunity'])),
         ]);
     }
 
@@ -518,13 +586,109 @@ class TrainingTaskController extends Controller
         $task->assignedStudents()->syncWithoutDetaching([$studentId]);
     }
 
+    private function syncCompanyFinalScoreFromTaskGrades(Application $application): void
+    {
+        $tasksQuery = $this->companyGradeTasksQuery($application);
+        $totalTasks = (clone $tasksQuery)->count();
+
+        if ($totalTasks === 0) {
+            $tasksQuery = Task::query()->where('application_id', $application->id);
+            $totalTasks = (clone $tasksQuery)->count();
+        }
+
+        if ($totalTasks === 0) {
+            return;
+        }
+
+        $gradedTasks = (clone $tasksQuery)->whereNotNull('company_score')->count();
+
+        if ($gradedTasks < $totalTasks) {
+            if (! $application->training_completed_at && $application->company_final_score !== null) {
+                $application->forceFill([
+                    'company_final_score' => null,
+                    'company_final_note' => null,
+                ])->save();
+            }
+
+            return;
+        }
+
+        $scores = (clone $tasksQuery)
+            ->whereNotNull('company_score')
+            ->pluck('company_score');
+
+        if ($scores->isEmpty()) {
+            return;
+        }
+
+        $application->forceFill([
+            'company_final_score' => (int) min(100, max(0, round($scores->avg() * 2))),
+            'company_final_note' => 'Calculated from company task grades (' . $scores->count() . ' tasks).',
+        ])->save();
+    }
+
+    private function companyGradeTasksQuery(Application $application): Builder
+    {
+        $application->loadMissing('opportunity:id,company_user_id');
+        $companyUserId = (int) optional($application->opportunity)->company_user_id;
+
+        return Task::query()
+            ->where('application_id', $application->id)
+            ->where(function (Builder $query) use ($companyUserId) {
+                $query->where('source', 'trello');
+
+                if ($companyUserId > 0) {
+                    $query->orWhere('created_by', $companyUserId);
+                }
+            });
+    }
+
+    private function completeTrainingIfFinalScoresReady(Application $application): bool
+    {
+        $application->refresh();
+
+        if ($application->training_completed_at) {
+            return true;
+        }
+
+        if ($application->company_final_score === null || $application->supervisor_final_score === null) {
+            return false;
+        }
+
+        if (! $this->isTrainingEnded($application)) {
+            return false;
+        }
+
+        $application->forceFill([
+            'final_score' => (int) round(($application->company_final_score + $application->supervisor_final_score) / 2),
+            'training_completed_at' => now(),
+        ])->save();
+
+        if ($application->student_id) {
+            $this->notifications->notifyUser(
+                userId: (int) $application->student_id,
+                title: 'Training Completed',
+                description: 'Your final training score is ready.',
+                type: 'success',
+                meta: ['category' => 'evaluation', 'application_id' => $application->id]
+            );
+        }
+
+        return true;
+    }
+
     private function workspaceData(Request $request): JsonResponse
     {
         $user = $request->user();
         abort_unless(in_array($user->role, ['company', 'student', 'supervisor', 'admin'], true), 403);
 
         if (in_array($user->role, ['company', 'supervisor', 'student'], true)) {
-            $this->syncTasksFromTrelloForUser($user);
+            try {
+                $this->syncTasksFromTrelloForUser($user);
+                $this->cleanupDuplicateTrelloTasksForUser($user);
+            } catch (\Throwable) {
+                // Keep the workspace usable even if Trello is temporarily unavailable.
+            }
         }
 
         $tasksQuery = Task::with([
@@ -619,6 +783,13 @@ class TrainingTaskController extends Controller
             'student_email' => $application->student?->email,
             'program_title' => $application->opportunity?->title,
             'training_end_date' => optional($this->getTrainingEndDate($application))->toDateString(),
+            'training_ended' => $this->isTrainingEnded($application),
+            'training_completed_at' => optional($application->training_completed_at)->toISOString(),
+            'company_final_score' => $application->company_final_score,
+            'company_final_note' => $application->company_final_note,
+            'supervisor_final_score' => $application->supervisor_final_score,
+            'supervisor_final_note' => $application->supervisor_final_note,
+            'final_score' => $application->final_score,
             'board_url' => route('tasks.board', ['application' => $application->id]),
         ];
     }
@@ -738,25 +909,73 @@ class TrainingTaskController extends Controller
             $statusLines = $relatedTasks->map(function (Task $relatedTask) {
                 $studentName = $relatedTask->application?->student?->name ?: 'Student';
                 $isSubmitted = filled($relatedTask->student_solution);
-                $mark = $isSubmitted ? '?' : '⬜';
+                $mark = $isSubmitted ? '[x]' : '[ ]';
 
                 return $mark . ' ' . $studentName . ' (ID: ' . (int) $relatedTask->application?->student_id . ')';
             })->implode("\n");
+
+            $this->syncTrelloSubmissionChecklist((string) $task->trello_card_id, $relatedTasks, $integration);
 
             $completedDueDate = $task->due_date
                 ? $task->due_date->copy()->endOfDay()->toIso8601String()
                 : now()->toIso8601String();
 
-            $baseTitle = preg_replace('/^\[\d+\s*\/\s*\d+\]\s*/', '', (string) $task->title) ?: (string) $task->title;
+            $cleanDescription = preg_replace(
+                '/\n\nSIPS Submission Progress:\n.*$/s',
+                '',
+                (string) ($task->details ?? '')
+            );
 
             $this->trello->updateCard((string) $task->trello_card_id, [
                 'due' => $completedDueDate,
                 'dueComplete' => $allSubmitted,
-                'name' => '[' . $submittedCount . '/' . max($totalCount, 1) . '] ' . $baseTitle,
-                'desc' => trim((string) ($task->details ?? '') . "\n\nSIPS Submission Progress:\n" . $statusLines),
+                'desc' => trim($cleanDescription . "\n\nSIPS Submission Progress:\n" . $statusLines),
             ], $integration);
         } catch (\Throwable) {
             // Keep the local submission saved even if Trello is temporarily unavailable.
+        }
+    }
+
+    private function syncTrelloSubmissionChecklist(string $cardId, $relatedTasks, TrelloIntegration $integration): void
+    {
+        if ($cardId === '') {
+            return;
+        }
+
+        $checklists = collect($this->trello->getCardChecklists($cardId, $integration));
+        $checklist = $checklists->first(fn (array $item) => (string) ($item['name'] ?? '') === 'SIP Student Submissions');
+
+        if (! $checklist) {
+            $checklist = $this->trello->createChecklist($cardId, 'SIP Student Submissions', $integration);
+        }
+
+        $checklistId = (string) ($checklist['id'] ?? '');
+        if ($checklistId === '') {
+            return;
+        }
+
+        $items = collect($checklist['checkItems'] ?? []);
+
+        foreach ($relatedTasks as $relatedTask) {
+            $student = $relatedTask->application?->student;
+            $studentId = (int) $relatedTask->application?->student_id;
+            $itemName = ($student?->name ?: 'Student') . ' (ID: ' . $studentId . ')';
+            $isSubmitted = filled($relatedTask->student_solution);
+
+            $checkItem = $items->first(function (array $item) use ($studentId, $itemName) {
+                $name = (string) ($item['name'] ?? '');
+
+                return str_contains($name, '(ID: ' . $studentId . ')') || $name === $itemName;
+            });
+
+            if (! $checkItem) {
+                $checkItem = $this->trello->createChecklistItem($checklistId, $itemName, $integration);
+            }
+
+            $checkItemId = (string) ($checkItem['id'] ?? '');
+            if ($checkItemId !== '') {
+                $this->trello->updateChecklistItemState($cardId, $checkItemId, $isSubmitted, $integration);
+            }
         }
     }
 
@@ -766,6 +985,7 @@ class TrainingTaskController extends Controller
         abort_unless(in_array($user->role, ['company', 'supervisor'], true), 403);
 
         $result = $this->syncTasksFromTrelloForUser($user, true);
+        $this->cleanupDuplicateTrelloTasksForUser($user);
 
         return response()->json([
             'status' => 'success',
@@ -774,8 +994,119 @@ class TrainingTaskController extends Controller
         ]);
     }
 
+    private function cleanupDuplicateTrelloTasksForUser(User $user): void
+    {
+        $tasksQuery = Task::with(['attachments', 'comments', 'assignedStudents'])
+            ->where('source', 'trello')
+            ->whereNotNull('trello_card_id');
+
+        if ($user->role === 'company') {
+            $tasksQuery->where(function (Builder $query) use ($user) {
+                $query->where('company_user_id', $user->id)
+                    ->orWhereHas('application.opportunity', fn (Builder $q) => $q->where('company_user_id', $user->id));
+            });
+        } elseif ($user->role === 'supervisor') {
+            $tasksQuery->whereHas('application.student', fn (Builder $query) => $query->where('supervisor_code', $user->supervisor_code));
+        } elseif ($user->role === 'student') {
+            $tasksQuery->whereHas('assignedStudents', fn (Builder $query) => $query->where('users.id', $user->id));
+        } else {
+            return;
+        }
+
+        $duplicates = $tasksQuery->get()
+            ->groupBy(fn (Task $task) => $task->application_id . ':' . $task->trello_card_id)
+            ->filter(fn ($group) => $group->count() > 1);
+
+        foreach ($duplicates as $group) {
+            DB::transaction(function () use ($group) {
+                $sorted = $group->sortByDesc(function (Task $task) {
+                    return (filled($task->student_solution) ? 100 : 0)
+                        + ($task->attachments->isNotEmpty() ? 50 : 0)
+                        + (($task->company_score !== null || $task->supervisor_score !== null) ? 25 : 0);
+                })->values();
+
+                /** @var Task $keep */
+                $keep = $sorted->first();
+
+                foreach ($sorted->skip(1) as $duplicate) {
+                    if (! filled($keep->student_solution) && filled($duplicate->student_solution)) {
+                        $keep->student_solution = $duplicate->student_solution;
+                    }
+
+                    foreach (['company_score', 'supervisor_score'] as $scoreColumn) {
+                        if ($keep->{$scoreColumn} === null && $duplicate->{$scoreColumn} !== null) {
+                            $keep->{$scoreColumn} = $duplicate->{$scoreColumn};
+                        }
+                    }
+
+                    if ($keep->status !== 'done' && $duplicate->status === 'done') {
+                        $keep->status = 'done';
+                    }
+
+                    $duplicate->attachments()->update(['task_id' => $keep->id]);
+                    $duplicate->comments()->update(['task_id' => $keep->id]);
+                    $keep->assignedStudents()->syncWithoutDetaching($duplicate->assignedStudents->pluck('id')->all());
+                    TaskUser::query()->where('task_id', $duplicate->id)->delete();
+                    $duplicate->delete();
+                }
+
+                $keep->save();
+            });
+        }
+    }
+
     private function syncTasksFromTrelloForUser(User $user, bool $force = false): array
     {
+        $linksQuery = TrelloInternshipLink::query()->with(['integration']);
+
+        if ($user->role === 'company') {
+            $linksQuery->whereHas('integration', function (Builder $query) use ($user) {
+                $query->where('company_user_id', $user->id)->where('is_active', true);
+            });
+        } elseif ($user->role === 'supervisor') {
+            $companyIds = Application::query()
+                ->whereHas('student', fn (Builder $q) => $q->where('supervisor_code', $user->supervisor_code))
+                ->join('internship_opportunities', 'internship_opportunities.id', '=', 'applications.opportunity_id')
+                ->distinct()
+                ->pluck('internship_opportunities.company_user_id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            $linksQuery->whereHas('integration', function (Builder $query) use ($companyIds) {
+                $query->whereIn('company_user_id', $companyIds)->where('is_active', true);
+            });
+        } elseif ($user->role === 'student') {
+            $trainingIds = Application::query()
+                ->where('student_id', $user->id)
+                ->where('company_status', 'approved')
+                ->where('supervisor_status', 'approved')
+                ->where('final_status', 'approved')
+                ->whereNull('training_completed_at')
+                ->pluck('opportunity_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($trainingIds->isEmpty()) {
+                return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+            }
+
+            $linksQuery->whereIn('opportunity_id', $trainingIds)
+                ->whereHas('integration', fn (Builder $query) => $query->where('is_active', true));
+        } else {
+            return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+        }
+
+        $totals = ['created' => 0, 'updated' => 0, 'skipped' => 0];
+        foreach ($linksQuery->get() as $link) {
+            $result = $this->trelloTaskSync->syncInternshipLink($link, $force ? 'manual' : 'auto');
+            $totals['created'] += (int) ($result['created'] ?? 0);
+            $totals['updated'] += (int) ($result['updated'] ?? 0);
+            $totals['skipped'] += (int) ($result['skipped'] ?? 0);
+        }
+
+        return $totals;
+
         $linksQuery = TrelloInternshipLink::query()->with(['integration']);
 
         if ($user->role === 'company') {
@@ -924,7 +1255,7 @@ class TrainingTaskController extends Controller
             return null;
         }
 
-        return $application->approved_at->copy()->addMonths((int) $application->opportunity->duration)->startOfDay();
+        return $application->approved_at->copy()->addWeeks((int) $application->opportunity->duration)->startOfDay();
     }
 
     private function isTrainingEnded(Application $application): bool
@@ -946,6 +1277,12 @@ class TrainingTaskController extends Controller
         $application->load(['student', 'opportunity.companyUser']);
         $this->authorizeApplication($request, $application);
         $this->trainingEvaluationNotifier->notifyIfTrainingEnded($application);
+
+        if ($this->isTrainingEnded($application) && ! $application->training_completed_at) {
+            $this->syncCompanyFinalScoreFromTaskGrades($application);
+            $this->completeTrainingIfFinalScoresReady($application);
+            $application->refresh()->load(['student', 'opportunity.companyUser']);
+        }
 
         $trainingEnded = $this->isTrainingEnded($application);
         $trainingEndDate = $this->getTrainingEndDate($application);
@@ -1133,7 +1470,6 @@ class TrainingTaskController extends Controller
     public function gradeTask(Request $request, Application $application, Task $task): RedirectResponse
     {
         $this->authorizeApplication($request, $application);
-        $this->ensureTrainingOpen($application);
         abort_unless(in_array($request->user()->role, ['company', 'supervisor', 'admin'], true), 403);
         abort_unless((int) $application->id === (int) $task->application_id, 404);
 
@@ -1152,6 +1488,12 @@ class TrainingTaskController extends Controller
 
         $task->save();
 
+        if (in_array($request->user()->role, ['company', 'admin'], true)) {
+            $this->syncCompanyFinalScoreFromTaskGrades($application);
+        }
+
+        $trainingCompleted = $this->completeTrainingIfFinalScoresReady($application);
+
         if ($application->student_id) {
             $this->notifications->notifyUser(
                 userId: (int) $application->student_id,
@@ -1160,6 +1502,12 @@ class TrainingTaskController extends Controller
                 type: 'success',
                 meta: ['category' => 'evaluation']
             );
+        }
+
+        if ($trainingCompleted) {
+            return redirect()
+                ->route('training.complete', $application->id)
+                ->with('success', 'Training completed and final score is ready.');
         }
 
         return back()->with('success', 'تم حفظ التقييم بنجاح.');

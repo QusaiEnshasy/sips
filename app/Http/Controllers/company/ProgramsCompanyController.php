@@ -15,7 +15,19 @@ class ProgramsCompanyController extends Controller
 
         $companyId = Auth::id();
 
-        $query = InternshipOpportunity::withCount('applications')
+        $approvedStudentsFilter = function ($query) {
+            $query->where('company_status', 'approved')
+                ->where('supervisor_status', 'approved')
+                ->where('final_status', 'approved')
+                ->whereNotNull('approved_at')
+                ->whereNull('training_completed_at');
+        };
+
+        $query = InternshipOpportunity::withCount([
+            'applications',
+            'applications as approved_students_count' => $approvedStudentsFilter,
+        ])
+            ->withMin(['applications as training_started_at' => $approvedStudentsFilter], 'approved_at')
             ->where('company_user_id', $companyId);
 
         $search = trim((string) $request->get('search', ''));
@@ -47,21 +59,26 @@ class ProgramsCompanyController extends Controller
         $closedPrograms = InternshipOpportunity::where('company_user_id', $companyId)->where('status', 'closed')->count();
 
         if ($request->expectsJson() || $request->ajax()) {
+            $programs = $paginated->getCollection()->map(fn ($program) => [
+                'id' => $program->id,
+                'title' => $program->title,
+                'description' => $program->description,
+                'status' => $program->status === 'open' ? 'active' : 'completed',
+                'duration' => $program->duration,
+                'duration_weeks' => $program->duration,
+                'start_date' => $program->training_started_at,
+                'published_at' => $program->created_at?->toDateString(),
+                'applicants_count' => $program->applications_count,
+                'students_count' => $program->approved_students_count,
+                'progress' => $program->approved_students_count > 0
+                    ? ($program->status === 'open' ? 45 : 100)
+                    : 0,
+            ])->values();
+
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'programs' => $paginated->getCollection()->map(fn ($program) => [
-                        'id' => $program->id,
-                        'title' => $program->title,
-                        'description' => $program->description,
-                        'status' => $program->status === 'open' ? 'active' : 'completed',
-                        'duration' => $program->duration,
-                        'duration_weeks' => $program->duration,
-                        'start_date' => $program->created_at?->toDateString(),
-                        'applicants_count' => $program->applications_count,
-                        'students_count' => $program->applications_count,
-                        'progress' => $program->status === 'open' ? 45 : 100,
-                    ])->values(),
+                    'programs' => $programs,
                     'pagination' => [
                         'current_page' => $paginated->currentPage(),
                         'last_page' => $paginated->lastPage(),
@@ -72,7 +89,7 @@ class ProgramsCompanyController extends Controller
                         ['key' => 'total', 'icon' => 'bi bi-journal-bookmark', 'iconClass' => 'bg-primary', 'label' => 'total_programs', 'value' => (string) $totalPrograms],
                         ['key' => 'active', 'icon' => 'bi bi-play-circle', 'iconClass' => 'bg-success', 'label' => 'active', 'value' => (string) $openPrograms],
                         ['key' => 'draft', 'icon' => 'bi bi-file-earmark', 'iconClass' => 'bg-warning', 'label' => 'draft', 'value' => '0'],
-                        ['key' => 'students', 'icon' => 'bi bi-people', 'iconClass' => 'bg-info', 'label' => 'total_students', 'value' => (string) $paginated->getCollection()->sum('applications_count')],
+                        ['key' => 'students', 'icon' => 'bi bi-people', 'iconClass' => 'bg-info', 'label' => 'total_students', 'value' => (string) $programs->sum('students_count')],
                     ],
                 ],
             ]);
@@ -113,7 +130,8 @@ class ProgramsCompanyController extends Controller
                     'duration' => $program->duration,
                     'deadline' => $program->deadline,
                     'duration_weeks' => $program->duration,
-                    'start_date' => $program->created_at?->toDateString(),
+                    'start_date' => null,
+                    'published_at' => $program->created_at?->toDateString(),
                     'end_date' => $program->deadline,
                     'status' => $program->status === 'open' ? 'active' : 'completed',
                     'requirements' => $program->requirements ? preg_split("/\r\n|\n|\r/", $program->requirements) : [],
@@ -134,6 +152,15 @@ class ProgramsCompanyController extends Controller
             ->findOrFail($id);
 
         if ($request->expectsJson() || $request->ajax()) {
+            $approvedApplications = $program->applications
+                ->filter(fn ($application) => $application->company_status === 'approved'
+                    && $application->supervisor_status === 'approved'
+                    && $application->final_status === 'approved'
+                    && filled($application->approved_at)
+                    && blank($application->training_completed_at));
+            $trainingStartedAt = $approvedApplications->min('approved_at');
+            $trainingStartedAt = $trainingStartedAt ? $trainingStartedAt->toDateString() : null;
+
             $recentApplicants = $program->applications
                 ->sortByDesc('created_at')
                 ->take(6)
@@ -165,11 +192,14 @@ class ProgramsCompanyController extends Controller
                     'duration' => $program->duration,
                     'deadline' => $program->deadline,
                     'duration_weeks' => $program->duration,
-                    'start_date' => $program->created_at?->toDateString(),
+                    'start_date' => $trainingStartedAt,
+                    'published_at' => $program->created_at?->toDateString(),
                     'end_date' => $program->deadline,
                     'status' => $program->status === 'open' ? 'active' : 'completed',
-                    'progress' => $program->status === 'open' ? 45 : 100,
-                    'students_count' => $program->applications_count,
+                    'progress' => $approvedApplications->count() > 0
+                        ? ($program->status === 'open' ? 45 : 100)
+                        : 0,
+                    'students_count' => $approvedApplications->count(),
                     'applicants_count' => $program->applications_count,
                     'positions_available' => 30,
                     'requirements' => $program->requirements ? preg_split("/\r\n|\n|\r/", $program->requirements) : [],

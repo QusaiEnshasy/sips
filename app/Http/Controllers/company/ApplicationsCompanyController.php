@@ -14,13 +14,13 @@ class ApplicationsCompanyController extends Controller
     private function trainingProgressPercent(Application $application): int
     {
         $approvedAt = $application->approved_at;
-        $durationMonths = (int) optional($application->opportunity)->duration;
-        if (! $approvedAt || $durationMonths <= 0) {
+        $durationWeeks = (int) optional($application->opportunity)->duration;
+        if (! $approvedAt || $durationWeeks <= 0) {
             return 0;
         }
-            
+
         $start = $approvedAt->copy()->startOfDay();
-        $end = $approvedAt->copy()->addMonths($durationMonths)->startOfDay();
+        $end = $approvedAt->copy()->addWeeks($durationWeeks)->startOfDay();
         $totalDays = max(1, $start->diffInDays($end));
         $elapsed = min($totalDays, $start->diffInDays(now()->startOfDay()));
         
@@ -162,6 +162,14 @@ class ApplicationsCompanyController extends Controller
 
         if ($request->expectsJson() || $request->ajax()) {
             $name = (string) optional($application->student)->name;
+            $trainingEndDate = $application->approved_at && $application->opportunity?->duration
+                ? $application->approved_at->copy()->addWeeks((int) $application->opportunity->duration)->startOfDay()
+                : null;
+            $trainingEnded = (bool) (
+                $application->training_completed_at ||
+                ($trainingEndDate && now()->startOfDay()->greaterThanOrEqualTo($trainingEndDate))
+            );
+
             return response()->json([
                 'status' => 'success',
                 'data' => [
@@ -189,6 +197,18 @@ class ApplicationsCompanyController extends Controller
                         ? route('tasks.board', ['application' => $application->id])
                         : null,
                     'training_progress_percent' => $this->trainingProgressPercent($application),
+                    'training_end_date' => optional($trainingEndDate)->toDateString(),
+                    'training_ended' => $trainingEnded,
+                    'training_completed_at' => optional($application->training_completed_at)->toISOString(),
+                    'complete_url' => $application->training_completed_at
+                        ? route('training.complete', ['application' => $application->id])
+                        : null,
+                    'complete_training_url' => route('company.applications.complete-training', $application->id),
+                    'company_final_score' => $application->company_final_score,
+                    'company_final_note' => $application->company_final_note,
+                    'supervisor_final_score' => $application->supervisor_final_score,
+                    'supervisor_final_note' => $application->supervisor_final_note,
+                    'final_score' => $application->final_score,
                     'program_title' => optional($application->opportunity)->title,
                     'applied_at' => optional($application->created_at)->toISOString(),
                     'updated_at' => optional($application->updated_at)->toISOString(),

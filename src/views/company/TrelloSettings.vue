@@ -173,8 +173,8 @@
         <div>
           <h5 class="fw-bold mb-1">شروط إنشاء المهمة داخل Trello</h5>
           <p class="text-muted mb-1">أنشئ الكرت داخل Trello الحقيقي في القائمة المرتبطة بالبرنامج، ثم اضغط مزامنة من هنا.</p>
-          <small class="text-muted d-block">لازم يحتوي الكرت على طالب محدد داخل العنوان أو الوصف مثل: <strong>student: student@email.com</strong> أو <strong>student_id: 123456</strong>.</small>
-          <small class="text-muted d-block">الكرت بدون طالب محدد لن يظهر لأي طالب، حتى لا تنتشر المهمة لكل الطلاب بالغلط.</small>
+          <small class="text-muted d-block">إذا أردت المهمة لكل طلاب التدريب، أنشئ الكرت بشكل طبيعي داخل Trello وسيظهر تلقائيا.</small>
+          <small class="text-muted d-block">إذا أردتها لطالب محدد فقط، اكتب داخل العنوان أو الوصف مثل: <strong>student: student@email.com</strong> أو <strong>student_id: 123456</strong>.</small>
         </div>
       </div>
     </div>
@@ -316,8 +316,8 @@
               <div class="mb-4">
                 <label class="form-label fw-bold">نمط توزيع المهام على الطلاب</label>
                 <select class="form-select" v-model="assignmentMode">
-                  <option value="marker_required">حسب تحديد الطالب داخل الكرت فقط</option>
                   <option value="all">كل الطلاب المقبولين بهذا التدريب</option>
+                  <option value="marker_required">حسب تحديد الطالب داخل الكرت فقط</option>
                   <option value="selected">طلاب محددين فقط</option>
                 </select>
                 <div class="small text-muted mt-1">
@@ -400,7 +400,7 @@ const selectedBoard = ref(null)
 const selectedBoardId = ref('')
 const selectedInternshipId = ref('')
 const selectedListId = ref('')
-const assignmentMode = ref('marker_required')
+const assignmentMode = ref('all')
 const internshipStudents = ref([])
 const selectedTargetStudentIds = ref([])
 const isLoadingInternshipStudents = ref(false)
@@ -576,7 +576,7 @@ const openConnectModal = async (board) => {
   selectedBoardId.value = board.id
   selectedInternshipId.value = ''
   selectedListId.value = ''
-  assignmentMode.value = 'marker_required'
+  assignmentMode.value = 'all'
   internshipStudents.value = []
   selectedTargetStudentIds.value = []
   showConnectModal.value = true
@@ -685,7 +685,7 @@ const closeConnectModal = () => {
   selectedBoardId.value = ''
   selectedInternshipId.value = ''
   selectedListId.value = ''
-  assignmentMode.value = 'marker_required'
+  assignmentMode.value = 'all'
   internshipStudents.value = []
   selectedTargetStudentIds.value = []
   lists.value = []

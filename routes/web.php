@@ -13,6 +13,10 @@ use App\Http\Controllers\company\DashboardCompanyController;
 use App\Http\Controllers\company\JobController;
 use App\Http\Controllers\company\CompanyTrelloController;
 use App\Http\Controllers\company\ProgramsCompanyController;
+use App\Http\Controllers\Network\NetworkCardSaleController;
+use App\Http\Controllers\Network\NetworkDashboardController;
+use App\Http\Controllers\Network\NetworkExpenseController;
+use App\Http\Controllers\Network\NetworkSubscriberController;
 use App\Http\Controllers\student\StudentController;
 use App\Http\Controllers\student\SkillTestController;
 use App\Http\Controllers\student\JisrController;
@@ -25,6 +29,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+Route::prefix('network')->name('network.')->group(function () {
+    Route::get('/', NetworkDashboardController::class)->name('dashboard');
+    Route::resource('subscribers', NetworkSubscriberController::class)
+        ->only(['index', 'store', 'edit', 'update', 'destroy']);
+    Route::post('subscribers/{subscriber}/payments', [NetworkSubscriberController::class, 'storePayment'])
+        ->name('subscribers.payments.store');
+    Route::resource('sales', NetworkCardSaleController::class)
+        ->only(['index', 'store', 'destroy']);
+    Route::resource('expenses', NetworkExpenseController::class)
+        ->only(['index', 'store', 'destroy']);
+});
 
 Route::view('/login', 'spa')->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.process');
@@ -164,6 +180,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/workspace/tasks', [TrainingTaskController::class, 'workspace'])->name('tasks.workspace');
     Route::post('/workspace/tasks', [TrainingTaskController::class, 'storeWorkspaceTask'])->name('tasks.workspace.store');
     Route::post('/workspace/tasks/sync', [TrainingTaskController::class, 'syncWorkspaceTasks'])->name('tasks.workspace.sync');
+    Route::post('/workspace/applications/{application}/company-evaluation', [TrainingTaskController::class, 'saveCompanyFinalEvaluation'])->name('tasks.workspace.company-evaluation');
     Route::post('/workspace/tasks/{task}/submit', [TrainingTaskController::class, 'submitWorkspaceTask'])->name('tasks.workspace.submit');
     Route::post('/workspace/tasks/{task}/grade', [TrainingTaskController::class, 'gradeWorkspaceTask'])->name('tasks.workspace.grade');
     Route::get('/admin/tasks/workspace', [TrainingTaskController::class, 'adminWorkspace'])->name('tasks.admin.workspace');

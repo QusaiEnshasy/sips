@@ -688,7 +688,7 @@ class SupervisorController extends Controller
                     'tasksTotal' => $tasksTotal,
                     'enrolledDate' => optional($application?->approved_at)->toDateString(),
                     'expectedEndDate' => $application && $application->approved_at && $application->opportunity?->duration
-                        ? $application->approved_at->copy()->addMonths((int) $application->opportunity->duration)->toDateString()
+                        ? $application->approved_at->copy()->addWeeks((int) $application->opportunity->duration)->toDateString()
                         : null,
                     'board_url' => $application ? route('tasks.board', ['application' => $application->id]) : null,
                 ],
@@ -733,7 +733,7 @@ class SupervisorController extends Controller
         }
 
         $start = Carbon::parse($application->approved_at);
-        $end = Carbon::parse($application->approved_at)->addMonths((int)$application->opportunity->duration);
+        $end = Carbon::parse($application->approved_at)->addWeeks((int)$application->opportunity->duration);
         $now = now();
 
         if ($now->lessThanOrEqualTo($start)) {

@@ -343,7 +343,7 @@ class ReportsController extends Controller
         }
 
         $start = Carbon::parse($application->approved_at);
-        $end = Carbon::parse($application->approved_at)->addMonths((int) $application->opportunity->duration);
+        $end = Carbon::parse($application->approved_at)->addWeeks((int) $application->opportunity->duration);
         $totalSeconds = max(1, $start->diffInSeconds($end));
         $elapsedSeconds = min($totalSeconds, max(0, $start->diffInSeconds(now())));
 

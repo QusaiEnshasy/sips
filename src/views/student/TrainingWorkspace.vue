@@ -102,6 +102,9 @@ const loadWorkspace = async () => {
   try {
     const res = await studentAPI.getWorkspace()
     activeApplication.value = res.data?.data?.active_application || null
+    if (activeApplication.value?.complete_url) {
+      window.location.href = activeApplication.value.complete_url
+    }
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to load workspace'
   } finally {

@@ -50,7 +50,7 @@
           </div>
 
           <div class="col-md-6">
-            <label class="form-label fw-bold">Duration (months)</label>
+            <label class="form-label fw-bold">Duration (weeks)</label>
             <input v-model.number="form.duration" type="number" min="1" class="form-control">
           </div>
 

@@ -58,10 +58,10 @@ class ApplicationController extends Controller
         abort_unless($application->final_status === 'approved', 422, 'إنهاء التدريب متاح فقط بعد القبول النهائي.');
         abort_if($application->training_completed_at, 422, 'تم إنهاء التدريب مسبقًا.');
 
-        $durationMonths = (int) ($application->opportunity?->duration ?? 0);
-        abort_unless($application->approved_at && $durationMonths > 0, 422, 'مدة التدريب غير مهيأة بعد.');
+        $durationWeeks = (int) ($application->opportunity?->duration ?? 0);
+        abort_unless($application->approved_at && $durationWeeks > 0, 422, 'مدة التدريب غير مهيأة بعد.');
 
-        $endDate = $application->approved_at->copy()->addMonths($durationMonths)->startOfDay();
+        $endDate = $application->approved_at->copy()->addWeeks($durationWeeks)->startOfDay();
         abort_unless(now()->startOfDay()->greaterThanOrEqualTo($endDate), 422, 'لم تنتهِ مدة التدريب بعد.');
     }
 
@@ -212,7 +212,7 @@ class ApplicationController extends Controller
         return $this->actionResponse($request, 'تم رفض الطلب بنجاح.');
     }
 
-    public function companyCompleteTraining(Request $request, int $id): RedirectResponse
+    public function companyCompleteTraining(Request $request, int $id): JsonResponse|RedirectResponse
     {
         $this->ensureRole($request, 'company');
 
@@ -227,13 +227,45 @@ class ApplicationController extends Controller
 
         $application->company_final_score = $validated['company_final_score'];
         $application->company_final_note = trim($validated['company_final_note']);
+        $trainingCompleted = false;
 
         if ($application->company_final_score !== null && $application->supervisor_final_score !== null) {
             $application->final_score = (int) round(($application->company_final_score + $application->supervisor_final_score) / 2);
             $application->training_completed_at = now();
+            $trainingCompleted = true;
         }
 
         $application->save();
+
+        if ($trainingCompleted) {
+            $this->notifications->notifyUser(
+                userId: (int) $application->student_id,
+                title: 'Training Completed',
+                description: 'Your final training score is ready.',
+                type: 'success',
+                meta: ['category' => 'evaluation', 'application_id' => $application->id]
+            );
+
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'تم حفظ تقييم الشركة واكتمال التدريب بنجاح.',
+                    'training_completed' => true,
+                    'complete_url' => route('training.complete', $application->id),
+                    'data' => [
+                        'application_id' => $application->id,
+                        'company_final_score' => $application->company_final_score,
+                        'supervisor_final_score' => $application->supervisor_final_score,
+                        'final_score' => $application->final_score,
+                        'training_completed_at' => optional($application->training_completed_at)->toISOString(),
+                    ],
+                ]);
+            }
+
+            return redirect()
+                ->route('training.complete', $application->id)
+                ->with('success', 'Training completed and final score is ready.');
+        }
 
         $this->notifications->notifyUser(
             userId: (int) $application->student_id,
@@ -261,13 +293,29 @@ class ApplicationController extends Controller
 
         $application->supervisor_final_score = $validated['supervisor_final_score'];
         $application->supervisor_final_note = trim($validated['supervisor_final_note']);
+        $trainingCompleted = false;
 
         if ($application->company_final_score !== null && $application->supervisor_final_score !== null) {
             $application->final_score = (int) round(($application->company_final_score + $application->supervisor_final_score) / 2);
             $application->training_completed_at = now();
+            $trainingCompleted = true;
         }
 
         $application->save();
+
+        if ($trainingCompleted) {
+            $this->notifications->notifyUser(
+                userId: (int) $application->student_id,
+                title: 'Training Completed',
+                description: 'Your final training score is ready.',
+                type: 'success',
+                meta: ['category' => 'evaluation', 'application_id' => $application->id]
+            );
+
+            return redirect()
+                ->route('training.complete', $application->id)
+                ->with('success', 'Training completed and final score is ready.');
+        }
 
         $this->notifications->notifyUser(
             userId: (int) $application->student_id,

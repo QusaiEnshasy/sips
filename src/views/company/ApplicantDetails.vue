@@ -116,6 +116,52 @@
               <span>{{ formatDate(applicant.updated_at) }}</span>
             </div>
           </div>
+
+          <div v-if="applicant.final_status === 'approved'" class="evaluation-card mb-4">
+            <h6 class="fw-bold mb-3">
+              <i class="bi bi-star-half text-primary me-2"></i>
+              تقييم مهمات الشركة
+            </h6>
+
+            <div v-if="applicant.training_completed_at" class="alert alert-success rounded-4 mb-3">
+              <div class="fw-bold">تم اعتماد النتيجة النهائية</div>
+              <div class="small mt-1">العلامة النهائية: {{ applicant.final_score ?? 0 }}/100</div>
+            </div>
+
+            <div v-else-if="applicant.training_ended && applicant.company_final_score === null" class="alert alert-warning rounded-4 mb-3">
+              <div class="fw-bold">قيّم مهمات الطالب من لوحة المهمات.</div>
+              <div class="small mt-1">علامة الشركة النهائية تُحسب تلقائيًا من متوسط تقييمات المهمات.</div>
+              <button
+                v-if="applicant.can_open_board"
+                type="button"
+                class="btn btn-primary btn-sm rounded-pill mt-3"
+                @click="openBoard"
+              >
+                فتح لوحة المهمات
+              </button>
+            </div>
+
+            <div v-else-if="applicant.training_ended" class="alert alert-info rounded-4 mb-3">
+              <div class="fw-bold">علامة مهمات الشركة: {{ applicant.company_final_score }}/100</div>
+              <div class="small mt-1" v-if="applicant.supervisor_final_score === null">
+                بانتظار تقييم المشرف حتى تظهر واجهة المباركة.
+              </div>
+            </div>
+
+            <div v-else class="alert alert-light border rounded-4 mb-3">
+              <div class="fw-bold">علامة الشركة تُحسب من تقييمات المهمات.</div>
+              <div class="small mt-1">تاريخ النهاية: {{ applicant.training_end_date || '-' }}</div>
+            </div>
+
+            <button
+              v-if="applicant.complete_url"
+              type="button"
+              class="btn btn-success w-100 rounded-pill"
+              @click="goTo(applicant.complete_url)"
+            >
+              واجهة المباركة والنتيجة
+            </button>
+          </div>
         </div>
 
         <!-- Right Column - Documents & Notes -->
@@ -231,7 +277,6 @@ const isRejecting = ref(false)
 const applicant = ref(null)
 const showRejectModal = ref(false)
 const rejectionReason = ref('')
-
 // ✅ جلب تفاصيل المتقدم من API
 const loadApplicantDetails = async () => {
   isLoading.value = true
@@ -253,8 +298,17 @@ const loadApplicantDetails = async () => {
       skills: data.skills || [],
       match_percentage: data.match_percentage,
       status: data.status,
+      final_status: data.final_status,
       can_open_board: !!data.can_open_board,
       board_url: data.board_url || null,
+      training_end_date: data.training_end_date || null,
+      training_ended: !!data.training_ended,
+      training_completed_at: data.training_completed_at || null,
+      complete_url: data.complete_url || null,
+      company_final_score: data.company_final_score,
+      supervisor_final_score: data.supervisor_final_score,
+      supervisor_final_note: data.supervisor_final_note,
+      final_score: data.final_score,
       program_title: data.program_title,
       applied_at: data.applied_at,
       updated_at: data.updated_at,
@@ -367,7 +421,17 @@ const goBack = () => {
   router.push('/company/applicants')
 }
 
+const goTo = (url) => {
+  if (!url) return
+  window.location.href = url
+}
+
 const openBoard = () => {
+  if (applicant.value?.board_url) {
+    window.location.href = applicant.value.board_url
+    return
+  }
+
   router.push('/company/training-tasks')
 }
 
@@ -404,7 +468,7 @@ onMounted(() => {
 .info-list { border-top: 1px solid #f0f0f0; padding-top: 20px; }
 .info-item { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
 .info-item i { width: 24px; font-size: 18px; }
-.status-card, .skills-card, .documents-card, .notes-card { background: white; border-radius: 20px; padding: 24px; border: 1px solid #f0f0f0; margin-bottom: 24px; }
+.status-card, .skills-card, .documents-card, .notes-card, .evaluation-card { background: white; border-radius: 20px; padding: 24px; border: 1px solid #f0f0f0; margin-bottom: 24px; }
 .skill-tag { background: #f3f0ff; color: #7c3aed; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; }
 .document-item { border: 1px solid #f0f0f0; border-radius: 12px; padding: 15px; margin-bottom: 10px; transition: all 0.2s; }
 .document-item:hover { border-color: #7c3aed; box-shadow: 0 2px 8px rgba(124,58,237,0.1); }
@@ -421,7 +485,8 @@ onMounted(() => {
 [data-theme="dark"] .status-card,
 [data-theme="dark"] .skills-card,
 [data-theme="dark"] .documents-card,
-[data-theme="dark"] .notes-card { background: #1f2937; border-color: #374151; }
+[data-theme="dark"] .notes-card,
+[data-theme="dark"] .evaluation-card { background: #1f2937; border-color: #374151; }
 [data-theme="dark"] .note-item { background: #111827; }
 [data-theme="dark"] .info-list { border-color: #374151; }
 [data-theme="dark"] .document-item { border-color: #374151; }

@@ -36,7 +36,7 @@
             <div class="col-md-4"><span class="text-muted">Field:</span> {{ program.field || '-' }}</div>
             <div class="col-md-4"><span class="text-muted">City:</span> {{ program.city || '-' }}</div>
             <div class="col-md-4"><span class="text-muted">Work Type:</span> {{ program.work_type || '-' }}</div>
-            <div class="col-md-4"><span class="text-muted">Duration:</span> {{ program.duration || 0 }} month(s)</div>
+            <div class="col-md-4"><span class="text-muted">Duration:</span> {{ program.duration || 0 }} week(s)</div>
             <div class="col-md-4"><span class="text-muted">Education:</span> {{ program.education_level || '-' }}</div>
             <div class="col-md-4"><span class="text-muted">Deadline:</span> {{ program.deadline || '-' }}</div>
           </div>

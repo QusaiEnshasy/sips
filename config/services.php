@@ -42,6 +42,6 @@ return [
         'todo_list_id' => env('TRELLO_TODO_LIST_ID'),
         'progress_list_id' => env('TRELLO_PROGRESS_LIST_ID'),
         'done_list_id' => env('TRELLO_DONE_LIST_ID'),
+        'verify_ssl' => env('TRELLO_VERIFY_SSL', true),
     ],
 ];
-

@@ -130,7 +130,7 @@
               </div>
               <div class="d-flex justify-content-between">
                 <span class="text-muted small">{{ t('start_date') }}</span>
-                <span class="fw-bold">{{ formatDate(program.start_date) }}</span>
+                <span class="fw-bold">{{ program.start_date ? formatDate(program.start_date) : 'لم يبدأ بعد' }}</span>
               </div>
             </div>
 

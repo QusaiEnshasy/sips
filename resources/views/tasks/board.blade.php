@@ -41,46 +41,64 @@
 @endif
 
 @php
-$needsCompanyFinal = $trainingEnded && in_array($role, ['company', 'admin']) && $application->company_final_score === null;
-$needsSupervisorFinal = $trainingEnded && in_array($role, ['supervisor', 'admin']) && $application->supervisor_final_score === null;
+$needsCompanyTaskGrades = $trainingEnded && in_array($role, ['company', 'admin']) && $application->company_final_score === null;
+$showFieldTrainingEvaluation = in_array($role, ['supervisor', 'admin']) && $application->final_status === 'approved';
+$missingFinalEvaluations = collect([
+    'تقييم مهمات الشركة' => $application->company_final_score === null,
+    'تقييم التدريب الميداني' => $application->supervisor_final_score === null,
+])->filter()->keys();
 @endphp
 
 @if($trainingEnded)
-<div class="alert alert-warning mb-4">
-    <div><strong>Training period ended.</strong> Tasks are now read-only.</div>
+<div class="alert {{ $application->training_completed_at ? 'alert-success' : 'alert-warning' }} mb-4">
+    @if($application->training_completed_at)
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <div class="fs-5 fw-bold">مبارك! تم إنهاء التدريب بنجاح</div>
+            <div class="small mt-1">العلامة النهائية: <strong>{{ $application->final_score ?? 0 }}/100</strong></div>
+            <div class="small mt-1">تقييم الشركة: {{ $application->company_final_score ?? '-' }}/100 | تقييم المشرف: {{ $application->supervisor_final_score ?? '-' }}/100</div>
+            <div class="small mt-1">Completed at: {{ $application->training_completed_at->format('Y-m-d H:i') }}</div>
+        </div>
+        <a href="{{ route('training.complete', $application->id) }}" class="btn btn-primary rounded-pill px-4">واجهة التهنئة والنتيجة</a>
+    </div>
+    @else
+    <div><strong>Training period ended.</strong> Student submissions are now read-only.</div>
     @if($trainingEndDate)
     <div class="small mt-1">End date: {{ $trainingEndDate->format('Y-m-d') }}</div>
     @endif
-    @if($application->training_completed_at)
-    <div class="small mt-1">Completed at: {{ $application->training_completed_at->format('Y-m-d H:i') }}</div>
-    <a href="{{ route('training.complete', $application->id) }}" class="btn btn-sm btn-primary rounded-pill mt-2">Open Completion Screen</a>
+    @if($missingFinalEvaluations->isNotEmpty())
+    <div class="small mt-2">واجهة التهنئة والنتيجة ستظهر هنا بعد اكتمال: {{ $missingFinalEvaluations->implode(' و ') }}.</div>
+    @endif
     @endif
 </div>
 @endif
 
-@if($needsCompanyFinal)
+@if($needsCompanyTaskGrades)
 <div class="bg-white rounded-4 border shadow-sm p-4 mb-4">
-    <h5 class="fw-bold mb-3">Company Final Evaluation (Required)</h5>
-    <form method="POST" action="{{ route('company.applications.complete-training', $application->id) }}" class="row g-3">
-        @csrf
-        <div class="col-md-3">
-            <label class="form-label">Score /100</label>
-            <input type="number" name="company_final_score" min="0" max="100" required class="form-control" value="{{ old('company_final_score', $application->company_final_score) }}">
-        </div>
-        <div class="col-md-9">
-            <label class="form-label">Final Note</label>
-            <textarea name="company_final_note" rows="3" class="form-control" required>{{ old('company_final_note', $application->company_final_note) }}</textarea>
-        </div>
-        <div class="col-12">
-            <button class="btn btn-primary rounded-pill px-4" type="submit">Save Final Evaluation</button>
-        </div>
-    </form>
+    <h5 class="fw-bold mb-2">تقييم مهمات الشركة مطلوب</h5>
+    <p class="text-muted mb-0">قيّم مهمات الشركة في الأسفل. علامة الشركة النهائية تُحسب تلقائيًا من متوسط تقييمات المهمات.</p>
 </div>
 @endif
 
-@if($needsSupervisorFinal)
+@if($showFieldTrainingEvaluation)
 <div class="bg-white rounded-4 border shadow-sm p-4 mb-4">
-    <h5 class="fw-bold mb-3">Supervisor Final Evaluation (Required)</h5>
+    <h5 class="fw-bold mb-3">التقييم النهائي للطالب - التدريب الميداني</h5>
+
+    @if($application->supervisor_final_score !== null)
+    <div class="alert alert-success mb-0">
+        <div class="fw-bold">تم حفظ تقييم التدريب الميداني: {{ $application->supervisor_final_score }}/100</div>
+        <div class="small mt-1">{{ $application->supervisor_final_note }}</div>
+    </div>
+    @elseif(! $trainingEnded)
+    <div class="alert alert-light border mb-0">
+        <div class="fw-bold">سيظهر حفظ التقييم النهائي بعد انتهاء مدة التدريب.</div>
+        @if($trainingEndDate)
+        <div class="small mt-1">End date: {{ $trainingEndDate->format('Y-m-d') }}</div>
+        @endif
+    </div>
+    @elseif($role !== 'supervisor')
+    <div class="alert alert-warning mb-0">تقييم التدريب الميداني يحفظه المشرف المسؤول.</div>
+    @else
     <form method="POST" action="{{ route('supervisor.applications.complete-training', $application->id) }}" class="row g-3">
         @csrf
         <div class="col-md-3">
@@ -92,9 +110,10 @@ $needsSupervisorFinal = $trainingEnded && in_array($role, ['supervisor', 'admin'
             <textarea name="supervisor_final_note" rows="3" class="form-control" required>{{ old('supervisor_final_note', $application->supervisor_final_note) }}</textarea>
         </div>
         <div class="col-12">
-            <button class="btn btn-primary rounded-pill px-4" type="submit">Save Final Evaluation</button>
+            <button class="btn btn-primary rounded-pill px-4" type="submit">حفظ تقييم التدريب الميداني</button>
         </div>
     </form>
+    @endif
 </div>
 @endif
 
@@ -182,7 +201,7 @@ $needsSupervisorFinal = $trainingEnded && in_array($role, ['supervisor', 'admin'
                 </form>
                 @endif
 
-                @if(in_array($role, ['company', 'supervisor']) && ! $trainingEnded)
+                @if(in_array($role, ['company', 'supervisor', 'admin']))
                 <form method="POST" action="{{ route('tasks.grade', [$application->id, $task->id]) }}" class="mb-2 d-flex gap-2">
                     @csrf
                     <input type="number" name="score" min="0" max="50" class="form-control form-control-sm" placeholder="Score /50" required>
@@ -224,4 +243,3 @@ $needsSupervisorFinal = $trainingEnded && in_array($role, ['supervisor', 'admin'
 </div>
 </body>
 </html>
-

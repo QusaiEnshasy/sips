@@ -24,7 +24,80 @@
     <div v-if="error" class="alert-box">{{ error }}</div>
     <div v-if="success" class="success-box">{{ success }}</div>
 
-        <section v-if="role === 'company' || role === 'supervisor'" class="create-panel">
+        <section v-if="role === 'company'" class="create-panel">
+      <div class="section-heading">
+        <div>
+          <h2>إدارة مهام الشركة من Trello</h2>
+          <p>أنشئ وعدّل المهام داخل بورد Trello الحقيقي، والنظام يزامنها تلقائيًا عند فتح هذه الشاشة.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="secondary-action" type="button" @click="syncNow" :disabled="loading">
+            مزامنة الآن
+          </button>
+          <router-link class="primary-action link-action" to="/company/trello-settings">
+            إعدادات Trello
+          </router-link>
+        </div>
+      </div>
+    </section>
+
+    <section v-if="role === 'company' && companyEvaluationApplications.length" class="final-evaluation-panel">
+      <div class="section-heading">
+        <div>
+          <h2>التقييم النهائي من الشركة</h2>
+          <p>هؤلاء الطلاب انتهت مدة تدريبهم. قيّم كل طالب بعلامة نهائية وملاحظة حتى تكتمل النتيجة مع تقييم المشرف.</p>
+        </div>
+      </div>
+
+      <div class="evaluation-grid">
+        <article v-for="application in companyEvaluationApplications" :key="application.id" class="evaluation-student-card">
+          <div class="evaluation-student-head">
+            <div>
+              <strong>{{ application.student_name }}</strong>
+              <small>{{ application.student_email }}</small>
+            </div>
+            <span>{{ application.program_title }}</span>
+          </div>
+
+          <div class="evaluation-status">
+            <span>نهاية التدريب: {{ application.training_end_date || '-' }}</span>
+            <span>تقييم المشرف: {{ application.supervisor_final_score ?? 'بانتظار المشرف' }}</span>
+          </div>
+
+          <div v-if="application.company_final_score !== null" class="success-box compact">
+            تم حفظ تقييم الشركة: {{ application.company_final_score }}/100
+          </div>
+
+          <form v-else class="final-evaluation-form" @submit.prevent="saveCompanyEvaluation(application)">
+            <label>
+              علامة الشركة النهائية
+              <input
+                v-model.number="companyEvaluations[application.id].score"
+                type="number"
+                min="0"
+                max="100"
+                required
+                placeholder="0 - 100"
+              />
+            </label>
+            <label>
+              ملاحظات الشركة
+              <textarea
+                v-model.trim="companyEvaluations[application.id].note"
+                rows="3"
+                required
+                placeholder="اكتب ملاحظتك النهائية على أداء الطالب"
+              ></textarea>
+            </label>
+            <button class="primary-action compact" :disabled="savingEvaluationId === application.id">
+              حفظ تقييم الشركة
+            </button>
+          </form>
+        </article>
+      </div>
+    </section>
+
+        <section v-if="role === 'supervisor'" class="create-panel">
       <div class="section-heading">
         <div>
           <h2>إنشاء مهمة من النظام (شركة/مشرف)</h2>
@@ -172,13 +245,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { trainingTasksAPI } from '@/services/api/trainingTasks'
 
 const loading = ref(false)
 const savingTask = ref(false)
 const submittingTaskId = ref(null)
 const gradingTaskId = ref(null)
+const savingEvaluationId = ref(null)
 const error = ref('')
 const success = ref('')
 const role = ref('')
@@ -188,6 +262,8 @@ const selectedStudentIds = ref([])
 const studentSubmissions = ref({})
 const taskFiles = ref({})
 const grades = ref({})
+const companyEvaluations = ref({})
+const autoSyncTimer = ref(null)
 
 const taskForm = ref({
   title: '',
@@ -234,8 +310,19 @@ const allStudentsSelected = computed(() => (
   filteredTrainingStudents.value.length > 0 && selectedStudentIds.value.length === filteredTrainingStudents.value.length
 ))
 
-const loadWorkspace = async () => {
-  loading.value = true
+const canSyncWithTrello = computed(() => ['company', 'supervisor', 'student'].includes(role.value))
+
+const companyEvaluationApplications = computed(() => (
+  applications.value.filter((application) => (
+    application.training_ended
+    && !application.training_completed_at
+  ))
+))
+
+const loadWorkspace = async ({ silent = false } = {}) => {
+  if (!silent) {
+    loading.value = true
+  }
   error.value = ''
   try {
     const { data } = await trainingTasksAPI.getWorkspace()
@@ -246,10 +333,45 @@ const loadWorkspace = async () => {
       task.id,
       role.value === 'supervisor' ? task.supervisor_score : task.company_score
     ]))
+    companyEvaluations.value = {
+      ...companyEvaluations.value,
+      ...Object.fromEntries(applications.value.map((application) => [
+        application.id,
+        {
+          score: application.company_final_score ?? '',
+          note: application.company_final_note || ''
+        }
+      ]))
+    }
   } catch (e) {
-    error.value = e?.response?.data?.message || 'تعذر تحميل شاشة التدريب.'
+    if (!silent) {
+      error.value = e?.response?.data?.message || 'تعذر تحميل شاشة التدريب.'
+    }
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
+  }
+}
+
+const autoSyncFromTrello = async ({ silent = true } = {}) => {
+  if (!canSyncWithTrello.value) return
+  if (!silent) {
+    loading.value = true
+    error.value = ''
+  }
+
+  try {
+    await trainingTasksAPI.syncTasks()
+    await loadWorkspace({ silent: true })
+  } catch (e) {
+    if (!silent) {
+      error.value = e?.response?.data?.message || 'تعذر تنفيذ مزامنة Trello.'
+    }
+  } finally {
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
 
@@ -280,15 +402,7 @@ const createTask = async () => {
 }
 
 const syncNow = async () => {
-  loading.value = true
-  try {
-    await trainingTasksAPI.syncTasks()
-    await loadWorkspace()
-  } catch (e) {
-    error.value = e?.response?.data?.message || 'Sync failed.'
-  } finally {
-    loading.value = false
-  }
+  await autoSyncFromTrello({ silent: false })
 }
 
 const setTaskFiles = (taskId, event) => {
@@ -318,7 +432,11 @@ const gradeTask = async (task) => {
   error.value = ''
   success.value = ''
   try {
-    await trainingTasksAPI.gradeTask(task.id, { score: grades.value[task.id] })
+    const response = await trainingTasksAPI.gradeTask(task.id, { score: grades.value[task.id] })
+    if (response.data?.complete_url) {
+      window.location.href = response.data.complete_url
+      return
+    }
     success.value = 'تم حفظ التقييم بنجاح.'
     await loadWorkspace()
   } catch (e) {
@@ -342,7 +460,51 @@ const creatorLabel = (creator) => {
   return creator.name || '-'
 }
 
-onMounted(loadWorkspace)
+const syncWhenVisible = () => {
+  if (!document.hidden) {
+    autoSyncFromTrello({ silent: true })
+  }
+}
+
+const saveCompanyEvaluation = async (application) => {
+  savingEvaluationId.value = application.id
+  error.value = ''
+  success.value = ''
+
+  try {
+    const form = companyEvaluations.value[application.id] || {}
+    const response = await trainingTasksAPI.saveCompanyEvaluation(application.id, {
+      company_final_score: form.score,
+      company_final_note: form.note
+    })
+
+    if (response.data?.complete_url) {
+      window.location.href = response.data.complete_url
+      return
+    }
+
+    success.value = response.data?.message || 'تم حفظ تقييم الشركة النهائي بنجاح.'
+    await loadWorkspace()
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'تعذر حفظ تقييم الشركة النهائي.'
+  } finally {
+    savingEvaluationId.value = null
+  }
+}
+
+onMounted(async () => {
+  await loadWorkspace()
+  await autoSyncFromTrello({ silent: true })
+  autoSyncTimer.value = window.setInterval(() => autoSyncFromTrello({ silent: true }), 15000)
+  document.addEventListener('visibilitychange', syncWhenVisible)
+})
+
+onUnmounted(() => {
+  if (autoSyncTimer.value) {
+    window.clearInterval(autoSyncTimer.value)
+  }
+  document.removeEventListener('visibilitychange', syncWhenVisible)
+})
 </script>
 
 <style scoped>
@@ -433,6 +595,64 @@ onMounted(loadWorkspace)
 .tasks-panel {
   border-radius: 28px;
   padding: 24px;
+}
+
+.final-evaluation-panel {
+  border: 1px solid #bbf7d0;
+  border-radius: 28px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.13), transparent 34%),
+    #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+}
+
+.evaluation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.evaluation-student-card {
+  border: 1px solid #dcfce7;
+  border-radius: 22px;
+  background: #f8fffb;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.evaluation-student-head,
+.evaluation-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.evaluation-student-head strong {
+  display: block;
+  color: #111827;
+  font-size: 18px;
+}
+
+.evaluation-student-head small,
+.evaluation-status {
+  color: #64748b;
+}
+
+.evaluation-student-head span {
+  align-self: start;
+  background: #ecfdf5;
+  border-radius: 999px;
+  color: #047857;
+  font-weight: 800;
+  padding: 7px 12px;
+}
+
+.final-evaluation-form {
+  display: grid;
+  gap: 12px;
 }
 
 .section-heading {
@@ -683,6 +903,11 @@ textarea {
   background: #d1fae5;
 }
 
+.success-box.compact {
+  padding: 12px;
+  border-radius: 14px;
+}
+
 .empty-state {
   text-align: center;
   color: #64748b;
@@ -695,6 +920,7 @@ textarea {
 
 @media (max-width: 992px) {
   .stats-grid,
+  .evaluation-grid,
   .tasks-grid,
   .form-grid {
     grid-template-columns: 1fr;

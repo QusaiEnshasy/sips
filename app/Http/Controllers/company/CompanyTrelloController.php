@@ -425,7 +425,7 @@ class CompanyTrelloController extends Controller
                 'list_name' => $link->trello_list_name,
                 'last_sync' => optional($link->last_synced_at)->toISOString(),
                 'sync_status' => $link->sync_status,
-                'assignment_mode' => $link->assignment_mode ?: 'marker_required',
+                'assignment_mode' => $link->assignment_mode ?: 'all',
                 'target_student_ids' => $targetStudentIds,
                 'target_students' => $targetStudents,
                 'sync_url' => route('company.trello.sync', ['internshipId' => $link->opportunity_id]),
@@ -481,7 +481,7 @@ class CompanyTrelloController extends Controller
             ->filter(fn ($id) => $id > 0)
             ->values();
 
-        $assignmentMode = (string) ($validated['assignment_mode'] ?? 'marker_required');
+        $assignmentMode = (string) ($validated['assignment_mode'] ?? 'all');
         $targetStudentIds = collect($validated['target_student_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
             ->filter(fn ($id) => $eligibleStudentIds->contains($id))
@@ -800,6 +800,9 @@ class CompanyTrelloController extends Controller
         $oauthParams['oauth_signature'] = base64_encode(hash_hmac('sha1', $baseString, $signingKey, true));
 
         $response = Http::asForm()
+            ->withOptions([
+                'verify' => (bool) config('services.trello.verify_ssl', true),
+            ])
             ->timeout(20)
             ->withHeaders([
                 'Authorization' => 'OAuth ' . collect($oauthParams)
