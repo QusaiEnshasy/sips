@@ -24,11 +24,13 @@ class Application extends Model
         'supervisor_final_note',
         'final_score',
         'training_completed_at',
+        'evaluation_request_notified_at',
     ];
 
     protected $casts = [
         'approved_at' => 'datetime',
         'training_completed_at' => 'datetime',
+        'evaluation_request_notified_at' => 'datetime',
     ];
  
 

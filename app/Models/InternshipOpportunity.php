@@ -35,4 +35,33 @@ class InternshipOpportunity extends Model
     {
         return $this->hasMany(Application::class, 'opportunity_id');
     }
+
+    public function getTitleAttribute($value): ?string
+    {
+        return $this->normalizePotentialMojibake($value);
+    }
+
+    public function setTitleAttribute($value): void
+    {
+        $this->attributes['title'] = $this->normalizePotentialMojibake($value);
+    }
+
+    private function normalizePotentialMojibake($value): ?string
+    {
+        if (!is_string($value) || $value === '') {
+            return $value;
+        }
+
+        // Detect common mojibake artifacts (UTF-8 text decoded as Windows-1252/ISO-8859-1).
+        if (!preg_match('/[ÃÂØÙ]/u', $value)) {
+            return $value;
+        }
+
+        $fixed = @iconv('Windows-1252', 'UTF-8//IGNORE', $value);
+        if (is_string($fixed) && $fixed !== '' && mb_check_encoding($fixed, 'UTF-8')) {
+            return $fixed;
+        }
+
+        return $value;
+    }
 }

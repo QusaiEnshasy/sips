@@ -8,13 +8,83 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use App\Models\Application;
+use App\Models\JisrSubmission;
+use App\Models\JisrTask;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use App\Services\NotificationService;
 
 class SupervisorController extends Controller
 {
+    private function buildJisrReviewsPayload(User $supervisor): array
+    {
+        $submissions = JisrSubmission::with(['task', 'user'])
+            ->whereHas('user', function ($query) use ($supervisor) {
+                $query->where('role', 'student')
+                    ->where('supervisor_code', $supervisor->supervisor_code);
+            })
+            ->orderByRaw("CASE WHEN status = 'pending_review' THEN 0 WHEN status = 'rejected' THEN 1 ELSE 2 END")
+            ->latest('submitted_at')
+            ->get();
+
+        $tasksCount = JisrTask::query()->count();
+
+        return [
+            'stats' => [
+                'total_submissions' => $submissions->count(),
+                'pending_reviews' => $submissions->where('status', 'pending_review')->count(),
+                'accepted_submissions' => $submissions->where('status', 'accepted')->count(),
+                'rejected_submissions' => $submissions->where('status', 'rejected')->count(),
+            ],
+            'submissions' => $submissions->map(function (JisrSubmission $submission) use ($tasksCount) {
+                $student = $submission->user;
+                $task = $submission->task;
+                $acceptedCount = JisrSubmission::query()
+                    ->where('user_id', $submission->user_id)
+                    ->where('status', 'accepted')
+                    ->count();
+
+                return [
+                    'id' => $submission->id,
+                    'status' => $submission->status,
+                    'score' => $submission->score,
+                    'feedback' => $submission->feedback,
+                    'content' => $submission->content,
+                    'submitted_at' => optional($submission->submitted_at)->toISOString(),
+                    'student' => [
+                        'id' => $student?->id,
+                        'name' => $student?->name,
+                        'email' => $student?->email,
+                        'university_id' => $student?->university_id,
+                        'is_in_jisr' => (bool) $student?->is_in_jisr,
+                        'accepted_tasks' => $acceptedCount,
+                        'total_tasks' => $tasksCount,
+                    ],
+                    'task' => [
+                        'id' => $task?->id,
+                        'title' => $task?->title,
+                        'description' => $task?->description,
+                        'instructions' => $task?->instructions,
+                        'type' => $task?->type,
+                        'max_score' => $task?->max_score,
+                        'order_number' => $task?->order_number,
+                    ],
+                    'attachments' => collect($submission->attachments ?? [])->map(function ($attachment) {
+                        $path = (string) ($attachment['path'] ?? '');
+
+                        return [
+                            'name' => $attachment['name'] ?? basename($path),
+                            'path' => $path,
+                            'url' => $path ? Storage::disk('public')->url($path) : null,
+                        ];
+                    })->values(),
+                ];
+            })->values(),
+        ];
+    }
+
     private function actionResponse(Request $request, string $message): JsonResponse|RedirectResponse
     {
         if ($request->expectsJson() || $request->ajax()) {
@@ -133,6 +203,7 @@ class SupervisorController extends Controller
                 'application_id' => $application->id,
                 'name' => $application->student?->name,
                 'email' => $application->student?->email,
+                'is_in_jisr' => (bool) ($application->student?->is_in_jisr),
                 'initials' => collect(explode(' ', (string) $application->student?->name))->filter()->map(fn ($n) => mb_substr($n, 0, 1))->take(2)->implode('') ?: 'ST',
                 'company' => $application->opportunity?->companyUser?->company_name ?: $application->opportunity?->companyUser?->name,
                 'program' => $application->opportunity?->title,
@@ -251,6 +322,7 @@ class SupervisorController extends Controller
                         'id' => $student->id,
                         'name' => $student->name,
                         'email' => $student->email,
+                        'is_in_jisr' => (bool) $student->is_in_jisr,
                         'company' => null,
                         'program' => null,
                         'status' => 'pending',
@@ -271,6 +343,7 @@ class SupervisorController extends Controller
                             'application_id' => $application?->id,
                             'name' => $student?->name,
                             'email' => $student?->email,
+                            'is_in_jisr' => (bool) $student?->is_in_jisr,
                             'company' => $row['opportunity']?->companyUser?->company_name ?? $row['opportunity']?->companyUser?->name,
                             'program' => $row['opportunity']?->title,
                             'status' => $row['status_label'] === 'At Risk' ? 'at-risk' : 'on-track',
@@ -286,6 +359,7 @@ class SupervisorController extends Controller
                         'id' => $student->id,
                         'name' => $student->name,
                         'email' => $student->email,
+                        'is_in_jisr' => (bool) $student->is_in_jisr,
                         'company' => null,
                         'program' => null,
                         'status' => 'rejected',
@@ -383,6 +457,127 @@ class SupervisorController extends Controller
         }
 
         return view('spa');
+    }
+
+    public function jisrReviewsPage()
+    {
+        $this->ensureRole();
+
+        $payload = $this->buildJisrReviewsPayload(Auth::user());
+
+        return view('supervisor.jisr-reviews-fixed', [
+            'stats' => $payload['stats'],
+            'submissions' => $payload['submissions'],
+        ]);
+    }
+
+    public function jisrReviewsData(Request $request): JsonResponse
+    {
+        $this->ensureRole();
+
+        $payload = $this->buildJisrReviewsPayload(Auth::user());
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $payload,
+        ]);
+    }
+
+    public function reviewJisrSubmission(Request $request, int $id): JsonResponse|RedirectResponse
+    {
+        $this->ensureRole();
+
+        $submission = JisrSubmission::with(['task', 'user'])->findOrFail($id);
+        $student = $submission->user;
+        $supervisor = $request->user();
+
+        abort_unless(
+            $student && $student->role === 'student' && $student->supervisor_code === $supervisor->supervisor_code,
+            403
+        );
+
+        $maxScore = (int) ($submission->task?->max_score ?? 100);
+        $validated = $request->validate([
+            'status' => ['required', 'in:accepted,rejected'],
+            'score' => ['nullable', 'integer', 'min:0', 'max:' . $maxScore],
+            'feedback' => ['required', 'string', 'max:3000'],
+        ]);
+
+        $status = $validated['status'];
+        $feedback = trim($validated['feedback']);
+        $score = $status === 'accepted'
+            ? (int) ($validated['score'] ?? $maxScore)
+            : ($validated['score'] ?? null);
+
+        if ($status === 'accepted' && ! array_key_exists('score', $validated)) {
+            $score = $maxScore;
+        }
+
+        $submission->forceFill([
+            'status' => $status,
+            'score' => $score,
+            'feedback' => $feedback,
+        ])->save();
+
+        $acceptedCount = JisrSubmission::query()
+            ->where('user_id', $student->id)
+            ->where('status', 'accepted')
+            ->count();
+        $totalTasks = JisrTask::query()->count();
+        $programCompleted = $totalTasks > 0 && $acceptedCount >= $totalTasks;
+
+        if ($programCompleted) {
+            $student->forceFill([
+                'is_in_jisr' => false,
+                'skill_test_required' => true,
+                'skill_test_passed' => false,
+                'jisr_completed_at' => now(),
+            ])->save();
+
+            $this->notifications->notifyUser(
+                userId: (int) $student->id,
+                title: 'تم إكمال برنامج الجسر',
+                description: 'تم تقييم جميع مهام برنامج الجسر بنجاح. يمكنك الآن التوجه إلى اختبار المهارات.',
+                type: 'success',
+                meta: ['category' => 'jisr']
+            );
+        } else {
+            $this->notifications->notifyUser(
+                userId: (int) $student->id,
+                title: $status === 'accepted' ? 'تم تقييم مهمة من برنامج الجسر' : 'تم طلب تعديل مهمة من برنامج الجسر',
+                description: $status === 'accepted'
+                    ? 'تم قبول أحد حلولك في برنامج الجسر.'
+                    : 'تم رفض أحد حلولك في برنامج الجسر ويحتاج إلى تعديل.',
+                type: $status === 'accepted' ? 'success' : 'warning',
+                meta: [
+                    'category' => 'jisr',
+                    'task_title' => $submission->task?->title,
+                    'reason' => $feedback,
+                ]
+            );
+        }
+
+        $message = $status === 'accepted'
+            ? 'تم اعتماد الحل بنجاح.'
+            : 'تم حفظ التقييم وطلب إعادة المحاولة من الطالب.';
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => $message,
+                'data' => [
+                    'program_completed' => $programCompleted,
+                    'submission' => [
+                        'id' => $submission->id,
+                        'status' => $submission->status,
+                        'score' => $submission->score,
+                        'feedback' => $submission->feedback,
+                    ],
+                ],
+            ]);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function studentDetails(Request $request, int $id)

@@ -3,6 +3,31 @@
 @section('title', 'Supervisor Dashboard')
 
 @section('content')
+@php
+    $fixMojibake = function ($value) {
+        if (!is_string($value) || $value === '') {
+            return $value;
+        }
+
+        $original = $value;
+        $current = $value;
+
+        for ($i = 0; $i < 2; $i++) {
+            if (!preg_match('/Ã|Â|â€|Ø|Ù/u', $current)) {
+                break;
+            }
+
+            $candidate = @iconv('Windows-1252', 'UTF-8//IGNORE', $current);
+            if (!is_string($candidate) || $candidate === '') {
+                break;
+            }
+
+            $current = $candidate;
+        }
+
+        return preg_match('/\p{Arabic}/u', $current) ? $current : $original;
+    };
+@endphp
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
     <div>
         <h3 class="fw-bold mb-1" data-i18n="supervisor_dashboard">Supervisor Dashboard</h3>
@@ -95,7 +120,8 @@
                         </div>
                     </div>
 
-                    <div class="mb-2 fw-semibold">{{ $card['opportunity']->title ?? '-' }}</div>
+                    @php $programTitle = $fixMojibake($card['opportunity']->title ?? null); @endphp
+                    <div class="mb-2 fw-semibold">{{ $programTitle ?: '-' }}</div>
                     <div class="text-muted small mb-3">{{ $card['status_label'] }}</div>
 
                     <div class="progress-label">

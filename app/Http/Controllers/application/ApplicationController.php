@@ -69,6 +69,17 @@ class ApplicationController extends Controller
     {
         $this->ensureRole($request, 'student');
 
+        $openApplication = Application::query()
+            ->where('student_id', $request->user()->id)
+            ->whereNull('training_completed_at')
+            ->whereIn('final_status', ['pending', 'approved'])
+            ->latest()
+            ->first();
+
+        if ($openApplication) {
+            return back()->with('error', 'لا يمكنك التقديم على أكثر من فرصة في نفس الوقت. أنهِ أو انتظر حسم الطلب الحالي أولًا.');
+        }
+
         $validated = $request->validate([
             'opportunity_id' => ['required', 'exists:internship_opportunities,id'],
             'skills' => ['nullable', 'string'],

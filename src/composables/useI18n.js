@@ -1,8 +1,7 @@
-import { ref, computed } from 'vue'
+﻿import { ref, computed } from 'vue'
 import { formatDistanceToNow, format } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 
-// استيراد الترجمات مباشرة من ملفات JSON
 import enCommon from '@/locales/en/common.json'
 import enAuth from '@/locales/en/auth.json'
 import enAdmin from '@/locales/en/admin.json'
@@ -21,7 +20,6 @@ import arShared from '@/locales/ar/shared.json'
 import arCompany from '@/locales/ar/company.json'
 import arErrors from '@/locales/ar/errors.json'
 
-// دمج كل الترجمات الإنجليزية
 const enTranslations = {
   ...enCommon,
   ...enAuth,
@@ -33,7 +31,6 @@ const enTranslations = {
   ...enErrors
 }
 
-// دمج كل الترجمات العربية
 const arTranslations = {
   ...arCommon,
   ...arAuth,
@@ -45,12 +42,11 @@ const arTranslations = {
   ...arErrors
 }
 
-// اللغة الحالية
 const currentLang = ref(localStorage.getItem('lang') || 'ar')
 
-// دالة تنسيق التاريخ
 const formatDate = (date, formatStr = 'PPP') => {
   if (!date) return ''
+
   const dateObj = new Date(date)
   if (isNaN(dateObj.getTime())) return ''
 
@@ -58,9 +54,9 @@ const formatDate = (date, formatStr = 'PPP') => {
   return format(dateObj, formatStr, { locale })
 }
 
-// دالة الوقت النسبي (منذ متى)
 const timeAgo = (date) => {
   if (!date) return ''
+
   const dateObj = new Date(date)
   if (isNaN(dateObj.getTime())) return ''
 
@@ -69,23 +65,29 @@ const timeAgo = (date) => {
 }
 
 export function useI18n() {
-  // دالة الترجمة
   const t = (key, params = {}) => {
-    // اختيار الترجمات حسب اللغة
-    const translations = currentLang.value === 'ar' ? arTranslations : enTranslations
+    const forcedTranslations = {
+      jisr_program: 'برنامج الجسر',
+      start_jisr_program: 'ابدأ برنامج الجسر',
+      complete_tasks_to_advance: 'أكمل مهام برنامج الجسر للانتقال إلى المرحلة التالية',
+      jisr_description: 'هذا المسار التأهيلي يساعدك على تطوير مهاراتك قبل العودة إلى المسار الأساسي',
+      program_progress: 'تقدم البرنامج'
+    }
 
-    // البحث عن الترجمة
+    if (forcedTranslations[key]) {
+      return forcedTranslations[key]
+    }
+
+    const translations = currentLang.value === 'ar' ? arTranslations : enTranslations
     let text = translations[key]
 
-    // إذا مش موجودة، رجّع المفتاح مع تحذير
     if (!text) {
-      console.warn(`⚠️ Missing translation: ${key}`)
+      console.warn(`Missing translation: ${key}`)
       return key
     }
 
-    // استبدال المتغيرات
     if (params && Object.keys(params).length > 0) {
-      Object.keys(params).forEach(param => {
+      Object.keys(params).forEach((param) => {
         text = text.replace(new RegExp(`{${param}}`, 'g'), params[param])
       })
     }
@@ -93,7 +95,6 @@ export function useI18n() {
     return text
   }
 
-  // تغيير اللغة (بدون إعادة تحميل الصفحة)
   const changeLanguage = (lang) => {
     if (lang === 'ar' || lang === 'en') {
       currentLang.value = lang

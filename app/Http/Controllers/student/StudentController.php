@@ -5,6 +5,7 @@ namespace App\Http\Controllers\student;
 use App\Models\Application;
 use App\Models\InternshipOpportunity;
 use App\Models\Task;
+use App\Services\TrainingEvaluationNotifier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,10 @@ use App\Http\Controllers\Controller;
 
 class StudentController extends Controller
 {
+    public function __construct(private readonly TrainingEvaluationNotifier $trainingEvaluationNotifier)
+    {
+    }
+
     private function ensureRole(): void
     {
         abort_unless(Auth::check() && Auth::user()->role === 'student', 403);
@@ -66,6 +71,9 @@ class StudentController extends Controller
         $rejectedApplications = $applications->where('final_status', 'rejected')->count();
 
         $activeTraining = $applications->first(fn ($application) => $application->final_status === 'approved');
+        if ($activeTraining) {
+            $this->trainingEvaluationNotifier->notifyIfTrainingEnded($activeTraining);
+        }
 
         if ($request->expectsJson() || $request->ajax()) {
             $applicationIds = $applications->pluck('id');
@@ -260,6 +268,9 @@ class StudentController extends Controller
         $activeApplication = $applications->first(function ($application) {
             return $application->final_status === 'approved';
         });
+        if ($activeApplication) {
+            $this->trainingEvaluationNotifier->notifyIfTrainingEnded($activeApplication);
+        }
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
@@ -312,6 +323,7 @@ class StudentController extends Controller
         $trainingEnded = false;
 
         if ($activeApplication && $activeApplication->approved_at && $activeApplication->opportunity?->duration) {
+            $this->trainingEvaluationNotifier->notifyIfTrainingEnded($activeApplication);
             $trainingEndDate = $activeApplication->approved_at->copy()->addMonths((int) $activeApplication->opportunity->duration)->startOfDay();
             $trainingEnded = now()->startOfDay()->greaterThanOrEqualTo($trainingEndDate);
         }

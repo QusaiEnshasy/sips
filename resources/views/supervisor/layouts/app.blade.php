@@ -119,6 +119,11 @@
             min-height: 100vh;
         }
 
+        [dir="rtl"] .main-content {
+            margin-left: 0;
+            margin-right: var(--sidebar-width);
+        }
+
         .theme-toggle-btn {
             width: 45px;
             height: 45px;
@@ -294,6 +299,7 @@
 
             .main-content {
                 margin-left: 0;
+                margin-right: 0;
                 width: 100%;
                 padding: 80px 16px 40px 16px;
             }
@@ -517,6 +523,7 @@
                 }
             });
         });
+
     </script>
 
     @stack('scripts')

@@ -90,35 +90,16 @@ class JisrController extends Controller
             [
                 'content' => $request->input('submission'),
                 'attachments' => $attachmentPaths,
-                'status' => 'accepted',
-                'score' => $task->max_score,
-                'feedback' => 'Task received successfully. You can continue to the next task.',
+                'status' => 'pending_review',
+                'score' => null,
+                'feedback' => 'تم استلام الحل وبانتظار تقييم المشرف.',
                 'submitted_at' => now(),
             ]
         );
 
-        $acceptedCount = JisrSubmission::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'accepted')
-            ->count();
-
-        $totalTasks = JisrTask::query()->count();
-        $programCompleted = $totalTasks > 0 && $acceptedCount >= $totalTasks;
-
-        if ($programCompleted) {
-            $user->forceFill([
-                'is_in_jisr' => false,
-                'skill_test_required' => true,
-                'skill_test_passed' => false,
-                'jisr_completed_at' => now(),
-            ])->save();
-        }
-
         return response()->json([
             'status' => 'success',
-            'message' => $programCompleted
-                ? 'Jisr program completed. You can now re-take the skill test.'
-                : 'Task submitted successfully.',
+            'message' => 'تم إرسال الحل وبانتظار تقييم المشرف.',
             'data' => [
                 'submission' => [
                     'id' => $submission->id,
@@ -126,8 +107,8 @@ class JisrController extends Controller
                     'score' => $submission->score,
                     'feedback' => $submission->feedback,
                 ],
-                'program_completed' => $programCompleted,
-                'next_path' => $programCompleted ? '/student/skill-test' : null,
+                'program_completed' => false,
+                'next_path' => null,
                 'user_state' => $this->userStatePayload($user->fresh()),
             ],
         ]);

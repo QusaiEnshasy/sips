@@ -17,9 +17,14 @@
             {{ student.name }} <span v-if="student.student_id">| {{ student.student_id }}</span>
           </p>
         </div>
-        <router-link class="btn btn-primary rounded-pill px-4" to="/student/browse-programs">
-          {{ t('browse_programs') }}
-        </router-link>
+        <div class="d-flex gap-2">
+          <button class="btn btn-success rounded-pill px-3" @click="testAlert">
+            <i class="bi bi-bell"></i> اختبار التنبيه
+          </button>
+          <router-link class="btn btn-primary rounded-pill px-4" to="/student/browse-programs">
+            {{ t('browse_programs') }}
+          </router-link>
+        </div>
       </div>
 
       <div class="row g-4 mb-4">
@@ -108,9 +113,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { studentAPI } from '@/services/api/student'
 import { useI18n } from '@/composables/useI18n'
+import { useAlerts } from '@/composables/useAlerts'
 
 const isLoading = ref(false)
 const { t } = useI18n()
+const { showSuccess, showError, showWarning, showInfo, showConfirm } = useAlerts()
 const error = ref('')
 const student = ref({})
 const stats = ref({})
@@ -135,6 +142,14 @@ const statusClass = (status) => {
 const openBoard = (url) => {
   if (!url) return
   window.location.href = url
+}
+
+const testAlert = async () => {
+  const result = await showConfirm('هل تريد رؤية مثال على التنبيهات الجميلة؟', 'تجربة التنبيهات')
+  if (result.isConfirmed) {
+    await showSuccess('تم بنجاح! هذا مثال على تنبيه نجاح جميل.', 'نجح!')
+    await showInfo('يمكنك استخدام أنواع مختلفة من التنبيهات في مشروعك.', 'معلومات')
+  }
 }
 
 const loadDashboard = async () => {

@@ -5,6 +5,78 @@
       <p class="text-muted mb-0">{{ t('manage_pending_approved_students') }}</p>
     </div>
 
+    <div class="jisr-entry-card mb-4 jisr-entry-card-strong">
+      <div>
+        <h5 class="fw-bold mb-1">تقييم برنامج الجسر</h5>
+        <p class="text-muted mb-0">من هنا تراجع حلول الطلاب في برنامج الجسر وتقيّمها.</p>
+      </div>
+      <button class="btn btn-primary" @click="goJisrReviews">
+        <i class="bi bi-clipboard-check me-2"></i>
+        فتح تقييم برنامج الجسر
+      </button>
+    </div>
+
+    <div class="card border-0 shadow-sm p-3 mb-4 jisr-review-card-strong">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+        <div>
+          <h5 class="fw-bold mb-1">تقييم حلول برنامج الجسر</h5>
+          <p class="text-muted mb-0">يمكنك من هنا مراجعة حلول الطلاب في الجسر واعتمادها أو إرجاعها مباشرة.</p>
+        </div>
+        <span class="badge bg-warning text-dark fs-6">بانتظار التقييم: {{ pendingJisrCount }}</span>
+      </div>
+
+      <div v-if="jisrReviews.length === 0" class="text-muted">لا توجد حلول مرسلة في برنامج الجسر حاليًا.</div>
+      <div v-else class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>الطالب</th>
+              <th>المهمة</th>
+              <th>الحالة</th>
+              <th>الحل</th>
+              <th>التقييم</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="submission in jisrReviews" :key="submission.id">
+              <td>
+                <div class="fw-bold">{{ submission.student?.name || '-' }}</div>
+                <small class="text-muted">{{ submission.student?.email || '-' }}</small>
+              </td>
+              <td>
+                <div class="fw-bold">{{ submission.task?.title || '-' }}</div>
+                <small class="text-muted">#{{ submission.task?.order_number || '-' }}</small>
+              </td>
+              <td>
+                <span class="badge" :class="jisrStatusBadge(submission.status)">
+                  {{ jisrStatusText(submission.status) }}
+                </span>
+              </td>
+              <td style="max-width:320px;">
+                <div class="small text-truncate">{{ submission.content || 'لا يوجد نص مرفق.' }}</div>
+                <div v-if="submission.attachments?.length" class="mt-1">
+                  <a
+                    v-for="(attachment, index) in submission.attachments"
+                    :key="index"
+                    :href="attachment.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="attachment-chip"
+                  >
+                    {{ attachment.name }}
+                  </a>
+                </div>
+              </td>
+              <td class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-sm btn-success" @click="openJisrReviewModal(submission, 'accepted')">اعتماد</button>
+                <button class="btn btn-sm btn-danger" @click="openJisrReviewModal(submission, 'rejected')">إعادة للطالب</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="row g-3 mb-4">
       <div class="col-md-4" v-for="item in statsCards" :key="item.label">
         <div class="card border-0 shadow-sm p-3">
@@ -28,7 +100,12 @@
           </thead>
           <tbody>
             <tr v-for="student in pendingStudents" :key="student.id">
-              <td class="fw-bold">{{ student.name }}</td>
+              <td>
+                <div class="fw-bold d-flex align-items-center gap-2 flex-wrap">
+                  <span>{{ student.name }}</span>
+                  <span v-if="student.is_in_jisr" class="badge jisr-badge">برنامج الجسر</span>
+                </div>
+              </td>
               <td>{{ student.email }}</td>
               <td class="d-flex gap-2">
                 <button class="btn btn-sm btn-success" @click="approvePending(student.id)">{{ t('approved') }}</button>
@@ -86,7 +163,10 @@
           <tbody>
             <tr v-for="student in approvedStudents" :key="student.application_id || student.id">
               <td>
-                <div class="fw-bold">{{ student.name }}</div>
+                <div class="fw-bold d-flex align-items-center gap-2 flex-wrap">
+                  <span>{{ student.name }}</span>
+                  <span v-if="student.is_in_jisr" class="badge jisr-badge">برنامج الجسر</span>
+                </div>
                 <small class="text-muted">{{ student.email }}</small>
               </td>
               <td>{{ student.program || '-' }}</td>
@@ -127,7 +207,12 @@
           </thead>
           <tbody>
             <tr v-for="student in studentsStatusTable" :key="`status-${student.id}`">
-              <td class="fw-bold">{{ student.name }}</td>
+              <td>
+                <div class="fw-bold d-flex align-items-center gap-2 flex-wrap">
+                  <span>{{ student.name }}</span>
+                  <span v-if="student.is_in_jisr" class="badge jisr-badge">برنامج الجسر</span>
+                </div>
+              </td>
               <td>{{ student.email || '-' }}</td>
               <td>{{ student.program || '-' }}</td>
               <td>
@@ -190,6 +275,51 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="jisrReviewModal.open" class="reject-modal-overlay" @click.self="closeJisrReviewModal">
+        <div class="reject-modal-card">
+          <div class="reject-modal-header">
+            <div>
+              <h5 class="fw-bold mb-1">{{ jisrReviewModal.action === 'accepted' ? 'اعتماد حل الجسر' : 'إرجاع حل الجسر' }}</h5>
+              <p class="text-muted small mb-0">{{ jisrReviewModal.studentName }} - {{ jisrReviewModal.taskTitle }}</p>
+            </div>
+            <button class="btn-close" type="button" @click="closeJisrReviewModal"></button>
+          </div>
+
+          <form @submit.prevent="submitJisrReview">
+            <div v-if="jisrReviewModal.action === 'accepted'" class="mt-3">
+              <label class="form-label fw-bold small">الدرجة</label>
+              <input
+                v-model.number="jisrReviewModal.score"
+                type="number"
+                min="0"
+                :max="jisrReviewModal.maxScore"
+                class="form-control"
+                required
+              >
+            </div>
+
+            <label class="form-label fw-bold small mt-3">ملاحظات المشرف</label>
+            <textarea
+              v-model="jisrReviewModal.feedback"
+              class="form-control reject-textarea"
+              rows="5"
+              placeholder="اكتب ملاحظتك للطالب هنا"
+              required
+            ></textarea>
+
+            <div class="reject-actions">
+              <button type="button" class="btn btn-light" @click="closeJisrReviewModal">إلغاء</button>
+              <button type="submit" class="btn btn-primary" :disabled="jisrReviewModal.submitting || !jisrReviewModal.feedback.trim()">
+                <span v-if="jisrReviewModal.submitting">جاري الحفظ...</span>
+                <span v-else>حفظ التقييم</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -207,12 +337,24 @@ const pendingStudents = ref([])
 const pendingTrainingApplications = ref([])
 const approvedStudents = ref([])
 const rejectedStudents = ref([])
+const jisrReviews = ref([])
 const rejectModal = ref({
   open: false,
   type: null,
   targetId: null,
   label: '',
   reason: '',
+  submitting: false
+})
+const jisrReviewModal = ref({
+  open: false,
+  submissionId: null,
+  action: 'accepted',
+  studentName: '',
+  taskTitle: '',
+  maxScore: 100,
+  score: 100,
+  feedback: '',
   submitting: false
 })
 
@@ -228,6 +370,7 @@ const studentsStatusTable = computed(() => {
   const rejected = rejectedStudents.value.map((s) => ({ ...s, status: 'rejected' }))
   return [...approved, ...rejected]
 })
+const pendingJisrCount = computed(() => jisrReviews.value.filter((item) => item.status === 'pending_review').length)
 
 const loadStudents = async () => {
   const res = await supervisorAPI.getStudents()
@@ -237,6 +380,11 @@ const loadStudents = async () => {
   pendingTrainingApplications.value = data.pending_training_applications || []
   approvedStudents.value = data.approved_students || []
   rejectedStudents.value = data.rejected_students || []
+}
+
+const loadJisrReviews = async () => {
+  const res = await supervisorAPI.getJisrReviews()
+  jisrReviews.value = res.data?.data?.submissions || []
 }
 
 const approvePending = async (id) => {
@@ -264,7 +412,20 @@ const deleteStudent = async (id) => {
 }
 
 const goStudent = (id) => router.push(`/supervisor/student/${id}`)
+const goJisrReviews = () => router.push('/supervisor/jisr-reviews')
 const openBoard = (url) => { if (url) window.location.href = url }
+
+const jisrStatusText = (status) => ({
+  pending_review: 'بانتظار التقييم',
+  accepted: 'تم الاعتماد',
+  rejected: 'مطلوب تعديل'
+}[status] || status)
+
+const jisrStatusBadge = (status) => ({
+  pending_review: 'bg-warning text-dark',
+  accepted: 'bg-success',
+  rejected: 'bg-danger'
+}[status] || 'bg-secondary')
 
 const openRejectModal = (type, id, label) => {
   rejectModal.value = {
@@ -288,6 +449,36 @@ const closeRejectModal = () => {
   }
 }
 
+const openJisrReviewModal = (submission, action) => {
+  jisrReviewModal.value = {
+    open: true,
+    submissionId: submission.id,
+    action,
+    studentName: submission.student?.name || '',
+    taskTitle: submission.task?.title || '',
+    maxScore: submission.task?.max_score || 100,
+    score: submission.score ?? submission.task?.max_score ?? 100,
+    feedback: action === 'accepted'
+      ? (submission.feedback || 'أحسنت، تم اعتماد الحل.')
+      : (submission.feedback || ''),
+    submitting: false
+  }
+}
+
+const closeJisrReviewModal = () => {
+  jisrReviewModal.value = {
+    open: false,
+    submissionId: null,
+    action: 'accepted',
+    studentName: '',
+    taskTitle: '',
+    maxScore: 100,
+    score: 100,
+    feedback: '',
+    submitting: false
+  }
+}
+
 const submitRejectReason = async () => {
   const reason = rejectModal.value.reason.trim()
   if (!reason) return
@@ -307,11 +498,79 @@ const submitRejectReason = async () => {
   }
 }
 
-onMounted(loadStudents)
+const submitJisrReview = async () => {
+  if (!jisrReviewModal.value.submissionId) return
+
+  jisrReviewModal.value.submitting = true
+  try {
+    await supervisorAPI.reviewJisrSubmission(jisrReviewModal.value.submissionId, {
+      status: jisrReviewModal.value.action,
+      score: jisrReviewModal.value.score,
+      feedback: jisrReviewModal.value.feedback
+    })
+    closeJisrReviewModal()
+    await loadJisrReviews()
+  } finally {
+    jisrReviewModal.value.submitting = false
+  }
+}
+
+onMounted(async () => {
+  await loadStudents()
+  await loadJisrReviews()
+})
 </script>
 
 <style scoped>
 .students-page { padding: 20px 0; }
+
+.jisr-entry-card {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(124, 58, 237, 0.02));
+  border: 1px solid #d8ccff;
+  border-radius: 20px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.jisr-entry-card-strong {
+  background: linear-gradient(135deg, #fff7cc, #fff1a8);
+  border: 2px solid #f59e0b;
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.15);
+}
+
+.jisr-entry-card-strong h5,
+.jisr-entry-card-strong p {
+  color: #7c2d12 !important;
+}
+
+.jisr-review-card-strong {
+  border: 2px solid #facc15 !important;
+  box-shadow: 0 12px 30px rgba(250, 204, 21, 0.12);
+}
+
+.jisr-badge {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.attachment-chip {
+  display: inline-block;
+  margin-inline-end: 6px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #6d28d9;
+  text-decoration: none;
+  font-size: 12px;
+}
 
 .reject-modal-overlay {
   position: fixed;

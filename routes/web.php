@@ -123,6 +123,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/supervisor/students/{id}/approve', [SupervisorController::class, 'supervisorActiveStudentAcouunt'])->name('supervisor.students.approve');
     Route::post('/supervisor/students/{id}/reject', [SupervisorController::class, 'rejectActiveStudentAcouunt'])->name('supervisor.students.reject');
     Route::post('/supervisor/students/{id}/delete', [SupervisorController::class, 'deleteStudent'])->name('supervisor.students.delete');
+    Route::get('/supervisor/jisr-reviews', [SupervisorController::class, 'jisrReviewsPage'])->name('supervisor.jisr-reviews');
+    Route::get('/supervisor/jisr-reviews/data', [SupervisorController::class, 'jisrReviewsData'])->name('supervisor.jisr-reviews.data');
+    Route::post('/supervisor/jisr-reviews/{id}/review', [SupervisorController::class, 'reviewJisrSubmission'])->name('supervisor.jisr-reviews.review');
     Route::get('/supervisor/applications', [SupervisorApplicationsController::class, 'applicationsPage'])->name('supervisor.applications.index');
     Route::get('/supervisor/applications/{id}', [SupervisorApplicationsController::class, 'show'])->name('supervisor.applications.show');
     Route::post('/supervisor/applications/{id}/approve', [ApplicationController::class, 'supervisorApplicationApprove'])->name('supervisor.applications.approve');

@@ -19,6 +19,17 @@
       </div>
     </div>
 
+    <div class="jisr-entry-card mb-4">
+      <div>
+        <h5 class="fw-bold mb-1">تقييم برنامج الجسر</h5>
+        <p class="text-muted mb-0">افتح صفحة تقييم حلول طلاب الجسر واعتمادها أو إرجاعها.</p>
+      </div>
+      <button class="btn btn-primary" @click="goJisrReviews">
+        <i class="bi bi-clipboard-check me-2"></i>
+        فتح تقييم برنامج الجسر
+      </button>
+    </div>
+
     <div class="card border-0 shadow-sm p-3 mb-4">
       <h5 class="fw-bold mb-3">{{ t('students_progress') }}</h5>
       <div v-if="students.length === 0" class="text-muted">{{ t('no_approved_students_yet') }}</div>
@@ -36,7 +47,10 @@
           <tbody>
             <tr v-for="student in students" :key="student.application_id">
               <td>
-                <div class="fw-bold">{{ student.name }}</div>
+                <div class="fw-bold d-flex align-items-center gap-2 flex-wrap">
+                  <span>{{ student.name }}</span>
+                  <span v-if="student.is_in_jisr" class="badge jisr-badge">برنامج الجسر</span>
+                </div>
                 <small class="text-muted">{{ student.email }}</small>
               </td>
               <td>{{ student.program }}</td>
@@ -135,6 +149,7 @@ const closeModal = () => {
 }
 
 const goStudent = (id) => router.push(`/supervisor/student/${id}`)
+const goJisrReviews = () => router.push('/supervisor/jisr-reviews')
 const openBoard = (url) => { if (url) window.location.href = url }
 
 onMounted(loadDashboard)
@@ -142,6 +157,24 @@ onMounted(loadDashboard)
 
 <style scoped>
 .supervisor-dashboard { padding: 20px 0; }
+.jisr-entry-card {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(124, 58, 237, 0.02));
+  border: 1px solid #d8ccff;
+  border-radius: 20px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.jisr-badge {
+  background: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+  font-size: 12px;
+  font-weight: 700;
+}
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1200; }
 .modal-content { background: #fff; width: min(520px, 92vw); border-radius: 16px; padding: 20px; }
 </style>

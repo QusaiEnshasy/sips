@@ -113,6 +113,12 @@ const routes = [
     meta: { requiresAuth: true, role: 'supervisor' }
   },
   {
+    path: '/supervisor/jisr-reviews',
+    name: 'SupervisorJisrReviews',
+    component: () => import('@/views/supervisor/JisrReviewsRedirect.vue'),
+    meta: { requiresAuth: true, role: 'supervisor' }
+  },
+  {
     path: '/supervisor/student/:id',
     name: 'StudentFullDetails',
     component: () => import('@/views/supervisor/StudentFullDetails.vue'),

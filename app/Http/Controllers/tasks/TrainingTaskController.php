@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\TrainingEvaluationNotifier;
 use App\Services\TrelloService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,8 @@ class TrainingTaskController extends Controller
 {
     public function __construct(
         private readonly TrelloService $trello,
-        private readonly NotificationService $notifications
+        private readonly NotificationService $notifications,
+        private readonly TrainingEvaluationNotifier $trainingEvaluationNotifier
     ) {
     }
 
@@ -46,6 +48,8 @@ class TrainingTaskController extends Controller
         if (! $application) {
             return back()->with('error', 'لا يوجد تدريب مكتمل الموافقات بعد لعرض لوحة المهام.');
         }
+
+        $this->trainingEvaluationNotifier->notifyIfTrainingEnded($application);
 
         return redirect()->route('tasks.board', $application->id);
     }
@@ -259,6 +263,7 @@ class TrainingTaskController extends Controller
     {
         $application->load(['student', 'opportunity.companyUser']);
         $this->authorizeApplication($request, $application);
+        $this->trainingEvaluationNotifier->notifyIfTrainingEnded($application);
 
         $trainingEnded = $this->isTrainingEnded($application);
         $trainingEndDate = $this->getTrainingEndDate($application);

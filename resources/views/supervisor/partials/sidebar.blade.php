@@ -11,27 +11,27 @@
 
     <a href="{{ route('supervisor.dashboard') }}" class="nav-link-custom {{ request()->routeIs('supervisor.dashboard') ? 'active' : '' }}">
         <i class="bi bi-grid-fill"></i>
-        <span>Dashboard</span>
-    </a>
-
-    <a href="{{ route('supervisor.applications.index') }}" class="nav-link-custom {{ request()->routeIs('supervisor.applications.*') ? 'active' : '' }}">
-        <i class="bi bi-file-earmark-text"></i>
-        <span>Applications</span>
+        <span>لوحة التحكم</span>
     </a>
 
     <a href="{{ route('supervisor.students.index') }}" class="nav-link-custom {{ request()->routeIs('supervisor.students.index') ? 'active' : '' }}">
         <i class="bi bi-people"></i>
-        <span>Students</span>
+        <span>الطلاب</span>
     </a>
 
-    <a href="{{ route('supervisor.students.pending') }}" class="nav-link-custom {{ request()->routeIs('supervisor.students.pending') ? 'active' : '' }}">
-        <i class="bi bi-person-check"></i>
-        <span>Pending Students</span>
+    <a href="{{ route('supervisor.jisr-reviews') }}" class="nav-link-custom {{ request()->routeIs('supervisor.jisr-reviews*') ? 'active' : '' }}">
+        <i class="bi bi-clipboard-check"></i>
+        <span>تقييم برنامج الجسر</span>
     </a>
 
     <a href="{{ route('supervisor.weekly-tasks') }}" class="nav-link-custom {{ request()->routeIs('supervisor.weekly-tasks') ? 'active' : '' }}">
         <i class="bi bi-journal-check"></i>
-        <span>Weekly Tasks</span>
+        <span>المهام الأسبوعية</span>
+    </a>
+
+    <a href="{{ route('notifications') }}" class="nav-link-custom {{ request()->routeIs('notifications') ? 'active' : '' }}">
+        <i class="bi bi-bell"></i>
+        <span>الإشعارات</span>
     </a>
 
     <div style="margin-top: auto;">
@@ -40,7 +40,7 @@
             @csrf
             <button type="submit" class="nav-link-custom text-danger border-0 bg-transparent w-100 text-start">
                 <i class="bi bi-box-arrow-left"></i>
-                <span>Logout</span>
+                <span>تسجيل الخروج</span>
             </button>
         </form>
     </div>

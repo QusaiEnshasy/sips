@@ -61,6 +61,7 @@
       class="mobile-overlay"
       @click="closeMenu"
     ></div>
+
   </Teleport>
 </template>
 
@@ -70,12 +71,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from '@/composables/useI18n'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import { useAlerts } from '@/composables/useAlerts'
 
 const { t, currentLang } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const toastStore = useToastStore()
+const { showConfirm } = useAlerts()
 
 const isOpen = ref(false)
 const direction = computed(() => currentLang.value === 'ar' ? 'rtl' : 'ltr')
@@ -183,7 +186,8 @@ const closeMenu = () => {
 
 // Handle logout
 const handleLogout = async () => {
-  if (!confirm(t('confirm_logout') || 'هل أنت متأكد من تسجيل الخروج؟')) {
+  const result = await showConfirm(t('confirm_logout') || 'هل أنت متأكد من تسجيل الخروج؟', t('logout') || 'تسجيل الخروج')
+  if (!result.isConfirmed) {
     return
   }
 

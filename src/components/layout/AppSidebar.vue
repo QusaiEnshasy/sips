@@ -26,7 +26,7 @@
           @click="closeSidebarOnMobile"
         >
           <i :class="item.icon"></i>
-          <span v-text="t(item.key)"></span>
+          <span v-text="item.label || t(item.key)"></span>
         </router-link>
       </nav>
     </div>
@@ -47,6 +47,7 @@
     class="sidebar-overlay d-md-none"
     @click="closeSidebar"
   ></div>
+
 </template>
 
 <script setup>
@@ -55,12 +56,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from '@/composables/useI18n'
 import { useToastStore } from '@/stores/toast'
+import { useAlerts } from '@/composables/useAlerts'
 
 const { t, currentLang } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const toastStore = useToastStore()
+const { showConfirm } = useAlerts()
 
 // حالة القائمة (للموبايل)
 const isOpen = ref(false)
@@ -97,10 +100,11 @@ const menuSections = computed(() => {
       {
         title: 'menu',
         items: [
-          { path: '/supervisor/dashboard', icon: 'bi bi-grid', key: 'dashboard' },
-          { path: '/supervisor/students', icon: 'bi bi-people', key: 'students' },
-          { path: '/supervisor/weekly-tasks', icon: 'bi bi-bar-chart-steps', key: 'weekly_tasks' },
-          { path: '/notifications', icon: 'bi bi-bell', key: 'notifications' }
+          { path: '/supervisor/dashboard', icon: 'bi bi-grid', key: 'dashboard', label: 'لوحة التحكم' },
+          { path: '/supervisor/students', icon: 'bi bi-people', key: 'students', label: 'الطلاب' },
+          { path: '/supervisor/jisr-reviews', icon: 'bi bi-clipboard-check', key: 'jisr_reviews', label: 'تقييم برنامج الجسر' },
+          { path: '/supervisor/weekly-tasks', icon: 'bi bi-bar-chart-steps', key: 'weekly_tasks', label: 'المهام الأسبوعية' },
+          { path: '/notifications', icon: 'bi bi-bell', key: 'notifications', label: 'الإشعارات' }
         ]
       }
     ],
@@ -111,7 +115,7 @@ const menuSections = computed(() => {
           {
             title: 'menu',
             items: [
-              { path: '/student/jisr', icon: 'bi bi-mortarboard', key: 'jisr_program' },
+              { path: '/student/jisr', icon: 'bi bi-mortarboard', key: 'jisr_program', label: 'برنامج الجسر' },
               { path: '/notifications', icon: 'bi bi-bell', key: 'notifications' }
             ]
           }
@@ -181,7 +185,8 @@ const closeSidebarOnMobile = () => {
 
 // ✅ دالة تسجيل الخروج مع تأكيد
 const confirmLogout = async () => {
-  if (confirm(t('confirm_logout') || 'هل أنت متأكد من تسجيل الخروج؟')) {
+  const result = await showConfirm(t('confirm_logout') || 'هل أنت متأكد من تسجيل الخروج؟', t('logout') || 'تسجيل الخروج')
+  if (result.isConfirmed) {
     await handleLogout()
   }
 }

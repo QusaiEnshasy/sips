@@ -46,6 +46,17 @@
       </div>
 
       <ToastContainer />
+      <BeautifulAlert
+        :show="alertState.show"
+        :title="alertState.title"
+        :message="alertState.message"
+        :type="alertState.type"
+        :confirm-text="alertState.confirmText"
+        :cancel-text="alertState.cancelText"
+        :show-cancel="alertState.showCancel"
+        @confirm="handleAlertConfirm"
+        @close="handleAlertClose"
+      />
     </template>
   </div>
 </template>
@@ -56,14 +67,17 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import { useToastStore } from '@/stores/toast'
+import { useAlerts } from '@/composables/useAlerts'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import ToastContainer from '@/components/common/ToastContainer.vue'
+import BeautifulAlert from '@/components/BeautifulAlert.vue'
 
 const { isDark } = useTheme()
 const authStore = useAuthStore()
 const router = useRouter()
 const toastStore = useToastStore()
+const { alertState, closeAlert } = useAlerts()
 
 const sidebarRef = ref(null)
 const windowWidth = ref(window.innerWidth)
@@ -80,6 +94,14 @@ const toggleSidebar = () => {
   if (sidebarRef.value) {
     sidebarRef.value.openSidebar()
   }
+}
+
+const handleAlertConfirm = () => {
+  closeAlert(true)
+}
+
+const handleAlertClose = () => {
+  closeAlert(false)
 }
 
 const updateWindowWidth = () => {

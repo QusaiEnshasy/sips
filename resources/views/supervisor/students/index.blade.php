@@ -3,6 +3,31 @@
 @section('title', 'Students')
 
 @section('content')
+@php
+    $fixMojibake = function ($value) {
+        if (!is_string($value) || $value === '') {
+            return $value;
+        }
+
+        $original = $value;
+        $current = $value;
+
+        for ($i = 0; $i < 2; $i++) {
+            if (!preg_match('/Ã|Â|â€|Ø|Ù/u', $current)) {
+                break;
+            }
+
+            $candidate = @iconv('Windows-1252', 'UTF-8//IGNORE', $current);
+            if (!is_string($candidate) || $candidate === '') {
+                break;
+            }
+
+            $current = $candidate;
+        }
+
+        return preg_match('/\p{Arabic}/u', $current) ? $current : $original;
+    };
+@endphp
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
     <div>
         <h3 class="fw-bold mb-1" data-i18n="students_title">Students</h3>
@@ -159,7 +184,8 @@
                                 <div class="fw-semibold">{{ $row['student']->name ?? '-' }}</div>
                                 <small class="text-muted">{{ $row['student']->email ?? '-' }}</small>
                             </td>
-                            <td class="px-4 py-3">{{ $row['opportunity']->title ?? '-' }}</td>
+                            @php $programTitle = $fixMojibake($row['opportunity']->title ?? null); @endphp
+                            <td class="px-4 py-3">{{ $programTitle ?: '-' }}</td>
                             <td class="px-4 py-3">{{ $row['progress'] ?? 0 }}%</td>
                             <td class="px-4 py-3">
                                 @php $label = $row['status_label'] ?? 'On Track'; @endphp

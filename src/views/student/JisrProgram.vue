@@ -8,8 +8,8 @@
             <i class="bi bi-mortarboard-fill"></i>
           </div>
           <div>
-            <h2 class="fw-bold mb-2">{{ t('jisr_program') }}</h2>
-            <p class="text-muted mb-0">{{ t('complete_tasks_to_advance') }}</p>
+            <h2 class="fw-bold mb-2">برنامج الجسر</h2>
+            <p class="text-muted mb-0">أكمل مهام برنامج الجسر للانتقال إلى المرحلة التالية</p>
           </div>
         </div>
         <router-link to="/student/dashboard" class="btn-back">
@@ -30,8 +30,8 @@
       <div class="progress-card mb-5" data-aos="fade-up">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <div>
-            <h5 class="fw-bold mb-1">{{ t('program_progress') }}</h5>
-            <p class="text-muted small mb-0">{{ t('jisr_description') }}</p>
+            <h5 class="fw-bold mb-1">تقدم البرنامج</h5>
+            <p class="text-muted small mb-0">هذا المسار التأهيلي يساعدك على تطوير مهاراتك قبل العودة للمسار الأساسي</p>
           </div>
           <div class="progress-percentage fw-bold">{{ completionRate }}%</div>
         </div>
@@ -260,8 +260,8 @@ const submitTask = async () => {
     // تحديث حالة المهمة
     const taskIndex = tasks.value.findIndex(t => t.id === selectedTask.value.id)
     if (taskIndex !== -1) {
-      tasks.value[taskIndex].status = response.data?.data?.submission?.status || 'accepted'
-      tasks.value[taskIndex].score = response.data?.data?.submission?.score || tasks.value[taskIndex].max_score
+      tasks.value[taskIndex].status = response.data?.data?.submission?.status || 'pending_review'
+      tasks.value[taskIndex].score = response.data?.data?.submission?.score
       tasks.value[taskIndex].feedback = response.data?.data?.submission?.feedback || ''
     }
     
@@ -272,7 +272,7 @@ const submitTask = async () => {
       return
     }
 
-    alert(t('task_submitted_success'))
+    alert(response.data?.message || 'تم إرسال الحل وبانتظار تقييم المشرف.')
   } catch (error) {
     console.error('Failed to submit task:', error)
     alert(t('error_occurred'))

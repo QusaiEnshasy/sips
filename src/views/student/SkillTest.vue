@@ -133,7 +133,7 @@
           <button v-if="testResult.score < (test?.passing_score || 70)" 
                   class="btn-start-jisr" @click="goToJisr">
             <i class="bi bi-mortarboard me-2"></i>
-            {{ t('start_jisr_program') }}
+            ابدأ برنامج الجسر
           </button>
         </div>
       </div>
