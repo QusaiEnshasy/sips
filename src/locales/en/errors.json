@@ -1,0 +1,10 @@
+{
+  "page_not_found": "Page Not Found",
+  "page_not_found_message": "Sorry, the page you are looking for does not exist or has been moved.",
+  "back_to_home": "Back to Home",
+  "error_occurred": "Error Occurred",
+  "try_again": "Try Again",
+  "unauthorized": "Unauthorized",
+  "forbidden": "Forbidden",
+  "server_error": "Server Error"
+}

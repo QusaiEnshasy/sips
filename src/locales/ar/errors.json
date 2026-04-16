@@ -1,0 +1,10 @@
+{
+  "page_not_found": "الصفحة غير موجودة",
+  "page_not_found_message": "عذراً، الصفحة التي تبحث عنها غير موجودة أو تم نقلها.",
+  "back_to_home": "العودة للرئيسية",
+  "error_occurred": "حدث خطأ",
+  "try_again": "حاول مرة أخرى",
+  "unauthorized": "غير مصرح بالدخول",
+  "forbidden": "لا تملك صلاحية الوصول",
+  "server_error": "خطأ في الخادم"
+}

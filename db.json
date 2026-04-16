@@ -1,0 +1,41 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "أحمد الطالب",
+      "email": "student@example.com",
+      "password": "12345678",
+      "role": "student",
+      "student_id": "STU-001",
+      "is_temporary_password": false,
+      "avatar": "https://ui-avatars.com/api/?name=أحمد&background=7c3aed&color=fff"
+    },
+    {
+      "id": 2,
+      "name": "د. سارة المشرف",
+      "email": "supervisor@example.com",
+      "password": "12345678",
+      "role": "supervisor",
+      "employee_id": "SUP-001",
+      "department": "علوم الحاسوب",
+      "is_temporary_password": false
+    },
+    {
+      "id": 3,
+      "name": "شركة التقنية",
+      "email": "company@example.com",
+      "password": "12345678",
+      "role": "company",
+      "company_name": "شركة التقنية",
+      "is_verified": true
+    },
+    {
+      "id": 4,
+      "name": "Admin",
+      "email": "admin@example.com",
+      "password": "12345678",
+      "role": "admin",
+      "is_temporary_password": false
+    }
+  ]
+}

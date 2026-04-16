@@ -1,0 +1,73 @@
+[data-theme="dark"] {
+  /* خلفيات */
+  --sidebar-bg: #111827;
+  --main-bg: #030712;
+  --card-bg: #1f2937;
+  --header-bg: #1f2937;
+  --input-bg: #374151;
+  
+  /* نصوص */
+  --text-dark: #f9fafb;
+  --text-muted: #d1d5db;
+  --text-light: #9ca3af;
+  
+  /* حدود */
+  --border-color: #1f2937;
+  --border-soft: #374151;
+  
+  /* ألوان ناعمة للخلفيات */
+  --accent-soft: rgba(124, 58, 237, 0.15);
+  
+  /* ظلال */
+  --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  --hover-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.4);
+}
+
+/* Dark mode overrides for Bootstrap */
+[data-theme="dark"] .bg-white {
+  background-color: var(--card-bg) !important;
+}
+
+[data-theme="dark"] .border {
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .text-muted {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+  background-color: var(--input-bg);
+  border-color: var(--border-color);
+  color: var(--text-dark);
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1);
+}
+
+[data-theme="dark"] .dropdown-menu {
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .dropdown-item {
+  color: var(--text-dark);
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+  background-color: var(--accent-soft);
+  color: var(--accent);
+}
+
+[data-theme="dark"] .modal-content {
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
