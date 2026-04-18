@@ -77,14 +77,22 @@ class StudentController extends Controller
 
         if ($request->expectsJson() || $request->ajax()) {
             $applicationIds = $applications->pluck('id');
-            $totalTasks = Task::whereIn('application_id', $applicationIds)->count();
-            $completedTasks = Task::whereIn('application_id', $applicationIds)->where('status', 'done')->count();
-            $pendingTasks = Task::whereIn('application_id', $applicationIds)->where('status', 'todo')->count();
-            $inProgressTasks = Task::whereIn('application_id', $applicationIds)->where('status', 'progress')->count();
+            $assignedTasks = Task::query()
+                ->whereIn('application_id', $applicationIds)
+                ->whereHas('assignedStudents', function ($query) use ($student) {
+                    $query->where('users.id', $student->id);
+                });
+            $totalTasks = (clone $assignedTasks)->count();
+            $completedTasks = (clone $assignedTasks)->where('status', 'done')->count();
+            $pendingTasks = (clone $assignedTasks)->where('status', 'todo')->count();
+            $inProgressTasks = (clone $assignedTasks)->where('status', 'progress')->count();
 
             $weeklyTasks = collect();
             if ($activeTraining) {
                 $weeklyTasks = Task::where('application_id', $activeTraining->id)
+                    ->whereHas('assignedStudents', function ($query) use ($student) {
+                        $query->where('users.id', $student->id);
+                    })
                     ->orderBy('due_date')
                     ->orderBy('id')
                     ->take(6)
@@ -349,6 +357,14 @@ class StudentController extends Controller
                         'training_ended' => $trainingEnded,
                         'progress' => $this->calculateProgress($activeApplication),
                         'board_url' => route('tasks.board', ['application' => $activeApplication->id]),
+                        'tasks_count' => $activeApplication
+                            ? Task::query()
+                                ->where('application_id', $activeApplication->id)
+                                ->whereHas('assignedStudents', function ($query) use ($student) {
+                                    $query->where('users.id', $student->id);
+                                })
+                                ->count()
+                            : 0,
                         'complete_url' => $activeApplication->training_completed_at
                             ? route('training.complete', ['application' => $activeApplication->id])
                             : null,

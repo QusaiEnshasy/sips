@@ -39,5 +39,6 @@ export const companyAPI = {
   getTrelloIntegrations: () => webApi.get('/company/trello/integrations'),
   connectTrelloBoard: (internshipId, data) => webApi.post(`/company/trello/internships/${internshipId}/connect`, data),
   syncTrello: (internshipId) => webApi.post(`/company/trello/internships/${internshipId}/sync`),
+  unlinkTrelloInternship: (internshipId) => webApi.delete(`/company/trello/internships/${internshipId}/unlink`),
   disconnectTrello: () => webApi.delete('/company/trello/disconnect')
 }

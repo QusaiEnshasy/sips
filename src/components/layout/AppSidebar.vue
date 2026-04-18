@@ -151,6 +151,7 @@ const menuSections = computed(() => {
           { path: '/company/dashboard', icon: 'bi bi-speedometer2', key: 'dashboard' },
           { path: '/company/programs', icon: 'bi bi-journal-bookmark', key: 'programs' },
           { path: '/company/applicants', icon: 'bi bi-people', key: 'applicants' },
+          { path: '/company/trello-settings', icon: 'bi bi-trello', key: 'trello_integration' },
           { path: '/company/reports', icon: 'bi bi-file-earmark-bar-graph', key: 'reports' },
           { path: '/notifications', icon: 'bi bi-bell', key: 'notifications' }
         ]
@@ -198,7 +199,6 @@ const handleLogout = async () => {
       type: 'success',
       message: t('logged_out_successfully')
     })
-    router.push('/login')
   } catch (error) {
     console.error('Logout failed:', error)
     toastStore.addToast({

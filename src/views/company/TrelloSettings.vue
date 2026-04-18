@@ -150,6 +150,9 @@
                 <span v-else-if="int.sync_status === 'success'" class="text-success ms-2">
                   <i class="bi bi-check-circle"></i> {{ t('synced') }}
                 </span>
+                <span v-else-if="int.sync_status === 'idle'" class="text-muted ms-2">
+                  <i class="bi bi-pause-circle"></i> {{ t('not_synced_yet') || 'Not synced yet' }}
+                </span>
                 <span v-else class="text-danger ms-2">
                   <i class="bi bi-exclamation-circle"></i> {{ t('sync_failed') }}
                 </span>
@@ -267,8 +270,13 @@ const connectionStatusIcon = computed(() => {
 const loadSettings = async () => {
   try {
     const response = await companyAPI.getTrelloSettings()
-    apiKey.value = response.data.data?.has_trello ? '' : apiKey.value
+    const settings = response.data.data || {}
+    apiKey.value = settings.has_trello ? '' : apiKey.value
     apiToken.value = ''
+
+    if (settings.has_trello) {
+      await loadBoards()
+    }
   } catch (error) {
     console.error('Failed to load Trello settings:', error)
   }
@@ -289,7 +297,7 @@ const loadBoards = async () => {
 const loadIntegrations = async () => {
   isLoadingIntegrations.value = true
   try {
-    const response = await companyAPI.getTrelloIntegrations?.() || { data: { data: [] } }
+    const response = await companyAPI.getTrelloIntegrations()
     integrations.value = response.data.data || []
   } catch (error) {
     console.error('Failed to load integrations:', error)
@@ -325,7 +333,7 @@ const saveSettings = async () => {
     setTimeout(() => { connectionStatus.value = '' }, 3000)
     await loadBoards()
   } catch (error) {
-    connectionStatus.value = t('error_saving_settings')
+    connectionStatus.value = error?.response?.data?.message || t('error_saving_settings')
     connectionStatusClass.value = 'text-danger'
   } finally {
     isSaving.value = false
@@ -342,7 +350,7 @@ const testConnection = async () => {
     connectionStatusClass.value = 'text-success'
     await loadBoards()
   } catch (error) {
-    connectionStatus.value = t('connection_failed')
+    connectionStatus.value = error?.response?.data?.message || t('connection_failed')
     connectionStatusClass.value = 'text-danger'
   } finally {
     isTesting.value = false
@@ -389,7 +397,7 @@ const connectInternship = async () => {
     closeConnectModal()
     await loadIntegrations()
   } catch (error) {
-    alert(t('connection_failed'))
+    alert(error?.response?.data?.message || t('connection_failed'))
   } finally {
     isConnecting.value = false
   }
@@ -408,11 +416,11 @@ const syncInternship = async (integration) => {
 const disconnectInternship = async (integration) => {
   if (confirm(t('confirm_disconnect'))) {
     try {
-      await companyAPI.disconnectTrello()
+      await companyAPI.unlinkTrelloInternship(integration.internship_id)
       await loadIntegrations()
       alert(t('disconnected'))
     } catch (error) {
-      alert(t('disconnect_failed'))
+      alert(error?.response?.data?.message || t('disconnect_failed'))
     }
   }
 }
@@ -429,7 +437,6 @@ const closeConnectModal = () => {
 onMounted(() => {
   AOS.init({ duration: 800, once: true })
   loadSettings()
-  loadBoards()
   loadIntegrations()
   loadInternships()
 })

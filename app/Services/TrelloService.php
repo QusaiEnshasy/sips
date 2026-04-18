@@ -2,12 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\Application;
-use App\Models\Task;
 use App\Models\TrelloIntegration;
-use App\Models\TrelloInternshipLink;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
+use Illuminate\Http\Client\RequestException;
 
 class TrelloService
 {
@@ -28,6 +25,13 @@ class TrelloService
         ];
     }
 
+    private function client()
+    {
+        return Http::acceptJson()
+            ->timeout(20)
+            ->retry(2, 250, throw: false);
+    }
+
     private function params(array $credentials, array $extra = []): array
     {
         return array_merge([
@@ -43,15 +47,67 @@ class TrelloService
         return ($credentials['key'] ?? '') !== '' && ($credentials['token'] ?? '') !== '';
     }
 
+    /**
+     * @throws RequestException
+     */
+    private function get(string $path, array $params = [], ?TrelloIntegration $integration = null): array
+    {
+        $credentials = $this->resolveCredentials($integration);
+
+        return $this->client()
+            ->get("{$this->baseUrl}{$path}", $this->params($credentials, $params))
+            ->throw()
+            ->json() ?: [];
+    }
+
+    /**
+     * @throws RequestException
+     */
+    private function post(string $path, array $params = [], ?TrelloIntegration $integration = null): array
+    {
+        $credentials = $this->resolveCredentials($integration);
+
+        return $this->client()
+            ->post("{$this->baseUrl}{$path}", $this->params($credentials, $params))
+            ->throw()
+            ->json() ?: [];
+    }
+
+    /**
+     * @throws RequestException
+     */
+    private function put(string $path, array $params = [], ?TrelloIntegration $integration = null): array
+    {
+        $credentials = $this->resolveCredentials($integration);
+
+        return $this->client()
+            ->put("{$this->baseUrl}{$path}", $this->params($credentials, $params))
+            ->throw()
+            ->json() ?: [];
+    }
+
+    /**
+     * @throws RequestException
+     */
+    private function delete(string $path, array $params = [], ?TrelloIntegration $integration = null): array
+    {
+        $credentials = $this->resolveCredentials($integration);
+
+        return $this->client()
+            ->delete("{$this->baseUrl}{$path}", $this->params($credentials, $params))
+            ->throw()
+            ->json() ?: [];
+    }
+
     public function getBoards(?TrelloIntegration $integration = null): array
     {
         if (! $this->isConfigured($integration)) {
             return [];
         }
 
-        $credentials = $this->resolveCredentials($integration);
-
-        return Http::get("{$this->baseUrl}/members/me/boards", $this->params($credentials))->json() ?: [];
+        return $this->get('/members/me/boards', [
+            'fields' => 'id,name,desc,prefs,url',
+        ], $integration);
     }
 
     public function getLists(string $boardId, ?TrelloIntegration $integration = null): array
@@ -60,9 +116,43 @@ class TrelloService
             return [];
         }
 
-        $credentials = $this->resolveCredentials($integration);
+        return $this->get("/boards/{$boardId}/lists", [
+            'fields' => 'id,name,closed,pos',
+        ], $integration);
+    }
 
-        return Http::get("{$this->baseUrl}/boards/{$boardId}/lists", $this->params($credentials))->json() ?: [];
+    public function getBoard(string $boardId, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $boardId === '') {
+            return [];
+        }
+
+        return $this->get("/boards/{$boardId}", [
+            'fields' => 'id,name,desc,url',
+        ], $integration);
+    }
+
+    public function getBoardCards(string $boardId, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $boardId === '') {
+            return [];
+        }
+
+        return $this->get("/boards/{$boardId}/cards", [
+            'fields' => 'id,name,desc,idList,due,dueComplete,closed,labels,shortUrl,dateLastActivity',
+            'filter' => 'open',
+        ], $integration);
+    }
+
+    public function getCard(string $cardId, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $cardId === '') {
+            return [];
+        }
+
+        return $this->get("/cards/{$cardId}", [
+            'fields' => 'id,name,desc,idList,due,dueComplete,closed,labels,shortUrl,dateLastActivity',
+        ], $integration);
     }
 
     public function createCard(string $listId, string $name, string $desc = '', ?TrelloIntegration $integration = null): array
@@ -71,13 +161,11 @@ class TrelloService
             return [];
         }
 
-        $credentials = $this->resolveCredentials($integration);
-
-        return Http::post("{$this->baseUrl}/cards", $this->params($credentials, [
+        return $this->post('/cards', [
             'idList' => $listId,
             'name' => $name,
             'desc' => $desc,
-        ]))->json() ?: [];
+        ], $integration);
     }
 
     public function getCards(string $listId, ?TrelloIntegration $integration = null): array
@@ -86,9 +174,10 @@ class TrelloService
             return [];
         }
 
-        $credentials = $this->resolveCredentials($integration);
-
-        return Http::get("{$this->baseUrl}/lists/{$listId}/cards", $this->params($credentials))->json() ?: [];
+        return $this->get("/lists/{$listId}/cards", [
+            'fields' => 'id,name,desc,idList,due,dueComplete,closed,labels,shortUrl,dateLastActivity',
+            'filter' => 'open',
+        ], $integration);
     }
 
     public function updateCard(string $cardId, array $data, ?TrelloIntegration $integration = null): array
@@ -97,9 +186,7 @@ class TrelloService
             return [];
         }
 
-        $credentials = $this->resolveCredentials($integration);
-
-        return Http::put("{$this->baseUrl}/cards/{$cardId}", $this->params($credentials, $data))->json() ?: [];
+        return $this->put("/cards/{$cardId}", $data, $integration);
     }
 
     public function moveCard(string $cardId, string $listId, ?TrelloIntegration $integration = null): array
@@ -113,9 +200,7 @@ class TrelloService
             return [];
         }
 
-        $credentials = $this->resolveCredentials($integration);
-
-        return Http::delete("{$this->baseUrl}/cards/{$cardId}", $this->params($credentials))->json() ?: [];
+        return $this->delete("/cards/{$cardId}", [], $integration);
     }
 
     public function getMemberProfile(?TrelloIntegration $integration = null): array
@@ -124,95 +209,8 @@ class TrelloService
             return [];
         }
 
-        $credentials = $this->resolveCredentials($integration);
-
-        return Http::get("{$this->baseUrl}/members/me", $this->params($credentials, [
+        return $this->get('/members/me', [
             'fields' => 'id,username,fullName,email',
-        ]))->json() ?: [];
-    }
-
-    public function syncOpportunityCards(TrelloInternshipLink $link): array
-    {
-        $link->loadMissing(['integration.company', 'opportunity']);
-
-        $integration = $link->integration;
-        if (! $integration || ! $this->isConfigured($integration)) {
-            return ['created' => 0, 'updated' => 0, 'skipped' => 0];
-        }
-
-        $cards = $this->getCards((string) $link->trello_list_id, $integration);
-        $applications = Application::with('student')
-            ->where('opportunity_id', $link->opportunity_id)
-            ->where('company_status', 'approved')
-            ->where('supervisor_status', 'approved')
-            ->where('final_status', 'approved')
-            ->whereNull('training_completed_at')
-            ->get();
-
-        if ($applications->isEmpty()) {
-            return ['created' => 0, 'updated' => 0, 'skipped' => count($cards)];
-        }
-
-        $created = 0;
-        $updated = 0;
-        $skipped = 0;
-
-        foreach ($applications as $application) {
-            foreach ($cards as $card) {
-                $cardId = (string) ($card['id'] ?? '');
-                $cardName = trim((string) ($card['name'] ?? ''));
-                if ($cardId === '' || $cardName === '') {
-                    $skipped++;
-                    continue;
-                }
-
-                $task = Task::query()->firstOrNew([
-                    'application_id' => $application->id,
-                    'trello_card_id' => $cardId,
-                ]);
-
-                $isNew = ! $task->exists;
-                $task->fill([
-                    'company_user_id' => $integration->company_user_id,
-                    'trello_integration_id' => $integration->id,
-                    'created_by' => $task->created_by ?: $integration->company_user_id,
-                    'trello_list_id' => (string) ($card['idList'] ?? $link->trello_list_id),
-                    'source' => 'trello',
-                    'title' => Str::limit($cardName, 255, ''),
-                    'details' => (string) ($card['desc'] ?? ''),
-                    'status' => $this->mapTrelloListToStatus((string) ($card['idList'] ?? $link->trello_list_id), $link),
-                    'label' => $task->label,
-                    'assigned_user' => $application->student?->name,
-                    'trello_last_synced_at' => now(),
-                    'order' => $task->order ?: ((Task::where('application_id', $application->id)->where('status', 'todo')->max('order') ?? 0) + 1),
-                ]);
-                $task->save();
-
-                $task->assignedStudents()->syncWithoutDetaching([(int) $application->student_id]);
-
-                if ($isNew) {
-                    $created++;
-                } else {
-                    $updated++;
-                }
-            }
-        }
-
-        $link->update([
-            'last_synced_at' => now(),
-            'sync_status' => 'ناجح',
-        ]);
-        $integration->update(['last_synced_at' => now()]);
-
-        return compact('created', 'updated', 'skipped');
-    }
-
-    private function mapTrelloListToStatus(string $listId, TrelloInternshipLink $link): string
-    {
-        if ($listId === $link->trello_list_id) {
-            return 'todo';
-        }
-
-        return 'todo';
+        ], $integration);
     }
 }

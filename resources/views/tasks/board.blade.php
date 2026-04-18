@@ -98,7 +98,15 @@ $needsSupervisorFinal = $trainingEnded && in_array($role, ['supervisor', 'admin'
 </div>
 @endif
 
-@if(in_array($role, ['company', 'supervisor']) && ! $trainingEnded)
+@if($role === 'company' && ! $trainingEnded)
+<div class="bg-white rounded-4 border shadow-sm p-4 mb-4">
+    <h5 class="fw-bold mb-2">Company Trello Workflow</h5>
+    <p class="text-muted mb-3">Company tasks are managed from Trello and then synced into Laravel for students and supervisors.</p>
+    <a href="{{ route('company.trello-settings') }}" class="btn btn-primary rounded-pill px-4">Open Trello Integration</a>
+</div>
+@endif
+
+@if(in_array($role, ['supervisor', 'admin']) && ! $trainingEnded)
 <div class="bg-white rounded-4 border shadow-sm p-4 mb-4">
     <h5 class="fw-bold mb-3">Create Task</h5>
     <form method="POST" action="{{ route('tasks.create', $application->id) }}" class="row g-3">
@@ -145,6 +153,11 @@ $needsSupervisorFinal = $trainingEnded && in_array($role, ['supervisor', 'admin'
 
                 <div class="small mb-2">
                     <strong>Due:</strong> {{ $task->due_date ? $task->due_date->format('Y-m-d') : '-' }}
+                    <br>
+                    <strong>Source:</strong> {{ strtoupper($task->source ?? 'manual') }}
+                    <br>
+                    <strong>Assigned students:</strong>
+                    {{ $task->assignedStudents->pluck('name')->filter()->implode(', ') ?: ($task->assigned_user ?: '-') }}
                     <br>
                     <strong>Score:</strong> {{ $task->company_score ?? 0 }} + {{ $task->supervisor_score ?? 0 }} / 100
                 </div>
@@ -211,5 +224,4 @@ $needsSupervisorFinal = $trainingEnded && in_array($role, ['supervisor', 'admin'
 </div>
 </body>
 </html>
-
 

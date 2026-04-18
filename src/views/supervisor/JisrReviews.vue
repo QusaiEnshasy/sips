@@ -65,19 +65,47 @@
           </div>
 
           <div v-if="submission.attachments?.length" class="attachments-box">
-            <div class="section-title">المرفقات</div>
+            <div class="attachments-header">
+              <div class="section-title mb-0">المرفقات</div>
+              <span class="attachments-count">{{ submission.attachments.length }} ملف</span>
+            </div>
             <div class="attachments-list">
-              <a
+              <div
                 v-for="(attachment, index) in submission.attachments"
                 :key="index"
-                :href="attachment.url"
-                class="attachment-link"
-                target="_blank"
-                rel="noopener noreferrer"
+                class="attachment-item"
               >
-                <i class="bi bi-paperclip"></i>
-                <span>{{ attachment.name }}</span>
-              </a>
+                <div class="attachment-item__info">
+                  <div class="attachment-item__icon">
+                    <i class="bi bi-file-earmark-arrow-up"></i>
+                  </div>
+                  <div>
+                    <div class="attachment-item__name">{{ attachment.name }}</div>
+                    <div class="attachment-item__meta">تم رفعه مع حل الطالب</div>
+                  </div>
+                </div>
+
+                <div class="attachment-item__actions">
+                  <a
+                    v-if="attachment.view_url"
+                    :href="attachment.view_url"
+                    class="attachment-btn attachment-btn--view"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <i class="bi bi-eye"></i>
+                    <span>فتح</span>
+                  </a>
+                  <a
+                    v-if="attachment.download_url"
+                    :href="attachment.download_url"
+                    class="attachment-btn attachment-btn--download"
+                  >
+                    <i class="bi bi-download"></i>
+                    <span>تنزيل</span>
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -395,6 +423,27 @@ onMounted(() => {
   margin-bottom: 10px;
 }
 
+.attachments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.attachments-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .status-pill {
   padding: 8px 14px;
   border-radius: 999px;
@@ -418,20 +467,82 @@ onMounted(() => {
 }
 
 .attachments-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  gap: 12px;
 }
 
-.attachment-link {
+.attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  padding: 14px 16px;
+}
+
+.attachment-item__info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.attachment-item__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--accent);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.attachment-item__name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-color);
+  word-break: break-word;
+}
+
+.attachment-item__meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.attachment-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.attachment-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  color: var(--accent);
-  background: rgba(124, 58, 237, 0.08);
   border-radius: 999px;
   padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attachment-btn--view {
+  color: var(--accent);
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.attachment-btn--download {
+  color: #166534;
+  background: #dcfce7;
 }
 
 .submission-footer {
@@ -518,6 +629,20 @@ onMounted(() => {
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .attachment-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .attachment-item__actions {
+    justify-content: stretch;
+  }
+
+  .attachment-btn {
+    justify-content: center;
+    width: 100%;
   }
 }
 </style>

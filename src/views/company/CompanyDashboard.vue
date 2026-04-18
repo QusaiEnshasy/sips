@@ -34,6 +34,10 @@
             </div>
           </div>
           <div class="d-flex gap-3">
+            <button class="btn-accent-outline" @click="openTrelloSettings">
+              <i class="bi bi-trello me-2"></i>
+              Trello
+            </button>
             <button class="btn-accent-gradient" @click="createProgram" :disabled="!companyInfo.verified">
               <i class="bi bi-plus-circle me-2"></i>
               {{ t('new_program') }}
@@ -370,6 +374,10 @@ const viewProgram = (program) => {
 
 const viewApplicant = (applicant) => {
   router.push(`/company/applicants/${applicant.id}`)
+}
+
+const openTrelloSettings = () => {
+  router.push('/company/trello-settings')
 }
 
 const openBoard = (applicant) => {

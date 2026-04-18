@@ -16,21 +16,36 @@ class SkillTestController extends Controller
         abort_unless(Auth::check() && Auth::user()->role === 'student', 403);
     }
 
-    public function show(): JsonResponse
+    public function show(Request $request): JsonResponse
     {
         $this->ensureRole();
 
         $user = Auth::user();
-        $test = SkillTest::query()
+        $selectedSpecialization = $request->query('specialization');
+        $tests = SkillTest::query()
             ->where('is_active', true)
             ->with('questions')
-            ->first();
+            ->orderBy('specialization_name')
+            ->get();
 
-        if (! $test) {
+        if ($tests->isEmpty()) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'No active skill test was found.',
             ], 404);
+        }
+
+        $test = null;
+
+        if ($selectedSpecialization) {
+            $test = $tests->firstWhere('specialization_code', $selectedSpecialization);
+
+            if (! $test) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The selected specialization test was not found.',
+                ], 404);
+            }
         }
 
         $lastResult = SkillTestResult::query()
@@ -41,23 +56,39 @@ class SkillTestController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'test' => [
+                'specializations' => $tests->map(fn ($skillTest) => [
+                    'code' => $skillTest->specialization_code ?: 'general',
+                    'name' => $skillTest->specialization_name ?: $skillTest->title,
+                    'description' => $skillTest->description,
+                    'questions_count' => $skillTest->questions->count(),
+                    'duration_minutes' => $skillTest->duration_minutes,
+                    'passing_score' => $skillTest->passing_score,
+                    'test_id' => $skillTest->id,
+                ])->values(),
+                'selected_specialization' => $test?->specialization_code,
+                'test' => $test ? [
                     'id' => $test->id,
                     'title' => $test->title,
                     'description' => $test->description,
+                    'specialization_code' => $test->specialization_code,
+                    'specialization_name' => $test->specialization_name,
                     'duration_minutes' => $test->duration_minutes,
                     'passing_score' => $test->passing_score,
-                ],
-                'questions' => $test->questions->map(fn ($question) => [
-                    'id' => $question->id,
-                    'question' => $question->question,
-                    'options' => $question->options,
-                    'correct_answer' => $question->correct_answer,
-                ])->values(),
+                ] : null,
+                'questions' => $test
+                    ? $test->questions->map(fn ($question) => [
+                        'id' => $question->id,
+                        'question' => $question->question,
+                        'options' => $question->options,
+                        'correct_answer' => $question->correct_answer,
+                    ])->values()
+                    : [],
                 'last_result' => $lastResult ? [
                     'score' => $lastResult->score,
                     'passed' => $lastResult->passed,
                     'completed_at' => optional($lastResult->completed_at)->toISOString(),
+                    'specialization_code' => $lastResult->specialization_code,
+                    'specialization_name' => $lastResult->specialization_name,
                 ] : null,
                 'user_state' => $this->userStatePayload($user),
             ],
@@ -71,12 +102,19 @@ class SkillTestController extends Controller
         $user = Auth::user();
         $data = $request->validate([
             'test_id' => ['required', 'integer', 'exists:skill_tests,id'],
+            'specialization_code' => ['required', 'string'],
             'answers' => ['required', 'array'],
         ]);
 
         $test = SkillTest::query()
             ->with('questions')
             ->findOrFail($data['test_id']);
+
+        abort_unless(
+            $test->specialization_code === $data['specialization_code'],
+            422,
+            'Selected specialization does not match the test.'
+        );
 
         $correctCount = 0;
         $answers = $data['answers'];
@@ -95,6 +133,8 @@ class SkillTestController extends Controller
         SkillTestResult::create([
             'user_id' => $user->id,
             'skill_test_id' => $test->id,
+            'specialization_code' => $test->specialization_code,
+            'specialization_name' => $test->specialization_name,
             'score' => $score,
             'passed' => $passed,
             'answers' => $answers,
@@ -114,6 +154,8 @@ class SkillTestController extends Controller
             'data' => [
                 'score' => $score,
                 'passed' => $passed,
+                'specialization_code' => $test->specialization_code,
+                'specialization_name' => $test->specialization_name,
                 'recommended_path' => $passed ? '/student/dashboard' : '/student/jisr',
                 'user_state' => $this->userStatePayload($user->fresh()),
             ],

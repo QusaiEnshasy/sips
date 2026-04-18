@@ -82,6 +82,26 @@
               </div>
             </div>
 
+            <div v-if="task.attachments?.length" class="task-files-box mt-3">
+              <div class="task-files-header">
+                <span class="fw-bold small">الملفات المرفوعة</span>
+                <span class="task-files-count">{{ task.attachments.length }} ملف</span>
+              </div>
+              <div class="task-files-list">
+                <a
+                  v-for="(attachment, attachmentIndex) in task.attachments"
+                  :key="`${task.id}-${attachmentIndex}`"
+                  :href="attachment.url"
+                  class="task-file-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <i class="bi bi-paperclip"></i>
+                  <span>{{ attachment.name }}</span>
+                </a>
+              </div>
+            </div>
+
             <button class="task-action-btn mt-3" :class="getButtonClass(task.status)" 
                     @click="handleTaskAction(task)" :disabled="isSubmitting === task.id">
               <span v-if="isSubmitting === task.id">
@@ -131,6 +151,7 @@
                 <input type="file" ref="fileInput" multiple hidden @change="handleFileSelect" accept=".pdf,.doc,.docx,.zip,.jpg,.png">
                 
                 <div v-if="attachments.length > 0" class="attachments-list mt-3">
+                  <div class="selected-files-summary">{{ attachments.length }} ملف جاهز للرفع</div>
                   <div v-for="(file, idx) in attachments" :key="idx" class="attachment-item">
                     <i :class="getFileIcon(file.name)"></i>
                     <span class="small">{{ file.name }}</span>
@@ -213,7 +234,8 @@ const loadTasks = async () => {
       status: t.submission?.status || 'pending',
       score: t.submission?.score,
       feedback: t.submission?.feedback,
-      instructions: t.instructions
+      instructions: t.instructions,
+      attachments: t.submission?.attachments || []
     }))
     
   } catch (error) {
@@ -244,8 +266,8 @@ const submitTask = async () => {
   try {
     const formData = new FormData()
     formData.append('submission', submissionContent.value)
-    attachments.value.forEach(file => {
-      formData.append('attachments[]', file)
+    attachments.value.forEach((file, index) => {
+      formData.append(`attachments[${index}]`, file, file.name)
     })
 
     const response = await studentAPI.submitJisrTask(selectedTask.value.id, formData)
@@ -263,6 +285,10 @@ const submitTask = async () => {
       tasks.value[taskIndex].status = response.data?.data?.submission?.status || 'pending_review'
       tasks.value[taskIndex].score = response.data?.data?.submission?.score
       tasks.value[taskIndex].feedback = response.data?.data?.submission?.feedback || ''
+      tasks.value[taskIndex].attachments = response.data?.data?.submission?.attachments || attachments.value.map(file => ({
+        name: file.name,
+        url: null
+      }))
     }
     
     closeSubmitModal()
@@ -290,7 +316,16 @@ const addFiles = (files) => {
       alert(t('file_too_large', { name: file.name }))
       continue
     }
+    const duplicate = attachments.value.some(existing => (
+      existing.name === file.name &&
+      existing.size === file.size &&
+      existing.lastModified === file.lastModified
+    ))
+    if (duplicate) continue
     attachments.value.push(file)
+  }
+  if (fileInput.value) {
+    fileInput.value.value = ''
   }
 }
 const removeAttachment = (index) => attachments.value.splice(index, 1)
@@ -355,6 +390,12 @@ onMounted(() => {
 .status-rejected { background: #fef2f2; color: #ef4444; }
 .status-pending { background: #f1f5f9; color: #64748b; }
 .feedback-box { background: var(--main-bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); margin-top: auto; }
+.task-files-box { background: var(--main-bg); padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); }
+.task-files-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.task-files-count { display: inline-flex; align-items: center; justify-content: center; padding: 4px 10px; border-radius: 999px; background: #f8fafc; border: 1px solid var(--border-color); font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.task-files-list { display: grid; gap: 8px; }
+.task-file-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--accent); background: rgba(124, 58, 237, 0.08); border-radius: 12px; padding: 8px 12px; font-size: 13px; font-weight: 600; }
+.selected-files-summary { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 10px; }
 .task-action-btn { margin-top: auto; padding: 10px; border-radius: 10px; font-weight: 600; font-size: 14px; transition: all 0.3s ease; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .btn-submit { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; }
 .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3); }

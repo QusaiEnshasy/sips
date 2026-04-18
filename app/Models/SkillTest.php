@@ -13,6 +13,8 @@ class SkillTest extends Model
     protected $fillable = [
         'title',
         'description',
+        'specialization_code',
+        'specialization_name',
         'duration_minutes',
         'passing_score',
         'is_active',

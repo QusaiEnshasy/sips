@@ -15,6 +15,7 @@ export default defineConfig({
     origin: 'http://localhost:3000',
   },
   build: {
+    manifest: true,
     target: 'esnext',
     minify: 'esbuild',
     rollupOptions: {

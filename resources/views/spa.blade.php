@@ -9,17 +9,23 @@
     <meta http-equiv="Expires" content="0">
     <title>SIP - App</title>
     @php
-        $vendorAsset = 'assets/vendor-DQfLmYUC.js';
-        $cssAsset = 'assets/index-Cxt7YYcM.css';
-        $jsAsset = 'assets/index-eB-YqcqT.js';
-        $vendorVersion = file_exists(public_path($vendorAsset)) ? filemtime(public_path($vendorAsset)) : time();
-        $cssVersion = file_exists(public_path($cssAsset)) ? filemtime(public_path($cssAsset)) : time();
-        $jsVersion = file_exists(public_path($jsAsset)) ? filemtime(public_path($jsAsset)) : time();
+        $manifestPath = public_path('.vite/manifest.json');
+        $manifest = file_exists($manifestPath)
+            ? json_decode(file_get_contents($manifestPath), true)
+            : [];
+
+        $entry = $manifest['index.html'] ?? null;
+        $jsAsset = isset($entry['file']) ? 'assets/' . basename($entry['file']) : null;
+        $cssAssets = collect($entry['css'] ?? [])
+            ->map(fn ($asset) => 'assets/' . basename($asset))
+            ->values();
+        $jsVersion = $jsAsset ? filemtime(public_path($jsAsset)) : time();
     @endphp
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    <link rel="modulepreload" crossorigin href="/{{ $vendorAsset }}?v={{ $vendorVersion }}">
-    <link rel="stylesheet" crossorigin href="/{{ $cssAsset }}?v={{ $cssVersion }}">
+    @foreach($cssAssets as $cssAsset)
+        <link rel="stylesheet" crossorigin href="/{{ $cssAsset }}?v={{ filemtime(public_path($cssAsset)) }}">
+    @endforeach
     <style>
         .logout-confirm-overlay {
             position: fixed;
@@ -203,7 +209,9 @@
             });
         })();
     </script>
-    <script type="module" crossorigin src="/{{ $jsAsset }}?v={{ $jsVersion }}"></script>
+    @if($jsAsset)
+        <script type="module" crossorigin src="/{{ $jsAsset }}?v={{ $jsVersion }}"></script>
+    @endif
 </body>
 </html>
 

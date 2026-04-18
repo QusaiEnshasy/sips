@@ -92,6 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/company/trello/integrations', [CompanyTrelloController::class, 'integrations'])->name('company.trello.integrations');
     Route::post('/company/trello/internships/{internshipId}/connect', [CompanyTrelloController::class, 'connectBoard'])->name('company.trello.connect');
     Route::post('/company/trello/internships/{internshipId}/sync', [CompanyTrelloController::class, 'syncInternship'])->name('company.trello.sync');
+    Route::delete('/company/trello/internships/{internshipId}/unlink', [CompanyTrelloController::class, 'unlinkInternship'])->name('company.trello.unlink');
     Route::delete('/company/trello/disconnect', [CompanyTrelloController::class, 'disconnect'])->name('company.trello.disconnect');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.mark-all-read');

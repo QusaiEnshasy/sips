@@ -14,12 +14,14 @@
 
           <!-- شعار الصفحة (يختلف حسب المسار) -->
           <div class="d-flex align-items-center gap-2">
-            <div
-              class="icon-box"
-              :style="{ background: pageIcon.background }"
-            >
-              <i :class="pageIcon.icon"></i>
-            </div>
+            <router-link :to="dashboardPath" class="icon-box-link">
+              <div
+                class="icon-box"
+                :style="{ background: pageIcon.background }"
+              >
+                <i :class="pageIcon.icon"></i>
+              </div>
+            </router-link>
             <div>
               <h5 class="fw-bold mb-0" v-text="pageTitle"></h5>
               <small class="text-muted" v-if="pageSubtitle" v-text="pageSubtitle"></small>
@@ -110,7 +112,8 @@ const pageTitle = computed(() => {
     '/admin/dashboard': t('admin_dashboard'),
     '/supervisor/dashboard': t('supervisor_dashboard'),
     '/student/dashboard': t('student_dashboard'),
-    '/company/dashboard': t('company_dashboard')
+    '/company/dashboard': t('company_dashboard'),
+    '/company/trello-settings': t('trello_integration')
   }
   return titles[route.path] || t('dashboard')
 })
@@ -120,7 +123,8 @@ const pageSubtitle = computed(() => {
     '/admin/dashboard': t('manage_text'),
     '/supervisor/dashboard': t('monitor_students'),
     '/student/dashboard': t('manage_training'),
-    '/company/dashboard': t('manage_training')
+    '/company/dashboard': t('manage_training'),
+    '/company/trello-settings': t('connect_trello_manage_tasks')
   }
   return subtitles[route.path] || ''
 })
@@ -131,16 +135,22 @@ const pageIcon = computed(() => {
     '/admin/dashboard': { icon: 'bi bi-speedometer2', background: 'var(--accent)' },
     '/supervisor/dashboard': { icon: 'bi bi-grid', background: 'var(--primary-purple)' },
     '/student/dashboard': { icon: 'bi bi-mortarboard-fill', background: 'var(--accent)' },
-    '/company/dashboard': { icon: 'bi bi-building', background: '#10b981' }
+    '/company/dashboard': { icon: 'bi bi-building', background: '#10b981' },
+    '/company/trello-settings': { icon: 'bi bi-trello', background: '#0079bf' }
   }
   return icons[route.path] || { icon: 'bi bi-house', background: 'var(--accent)' }
 })
 
-// بيانات المستخدم
-const userAvatar = computed(() => authStore.user?.avatar)
-const isSupervisor = computed(() => authStore.userType === 'supervisor')
-const supervisorCode = computed(() => authStore.user?.supervisor_code || '')
-const unreadCount = computed(() => notificationsStore.unreadCount)
+// مسار اللوحة المناسبة حسب الدور
+const dashboardPath = computed(() => {
+  const paths = {
+    'admin': '/admin/dashboard',
+    'supervisor': '/supervisor/dashboard',
+    'student': '/student/dashboard',
+    'company': '/company/dashboard'
+  }
+  return paths[authStore.userType] || '/login'
+})
 
 const copySupervisorCode = async () => {
   if (!supervisorCode.value) return
@@ -192,15 +202,14 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.icon-box {
-  width: 45px;
-  height: 45px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.2rem;
+.icon-box-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.icon-box-link:hover .icon-box {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
 }
 
 .search-wrapper {

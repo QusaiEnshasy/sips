@@ -7,7 +7,9 @@ use App\Models\JisrSubmission;
 use App\Models\JisrTask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class JisrController extends Controller
 {
@@ -45,6 +47,15 @@ class JisrController extends Controller
                         'score' => $submission->score,
                         'feedback' => $submission->feedback,
                         'submitted_at' => optional($submission->submitted_at)->toISOString(),
+                        'attachments' => collect($submission->attachments ?? [])->values()->map(function ($attachment) {
+                            $path = (string) ($attachment['path'] ?? '');
+
+                            return [
+                                'name' => $attachment['name'] ?? basename($path),
+                                'path' => $path,
+                                'url' => $path !== '' ? Storage::disk('public')->url($path) : null,
+                            ];
+                        })->values(),
                     ] : null,
                 ];
             })->values();
@@ -67,13 +78,24 @@ class JisrController extends Controller
 
         $request->validate([
             'submission' => ['nullable', 'string', 'required_without:attachments'],
-            'attachments' => ['nullable', 'array'],
+            'attachments' => ['nullable'],
             'attachments.*' => ['file', 'max:10240'],
         ]);
 
-        $attachmentPaths = [];
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
+        $existingSubmission = JisrSubmission::query()
+            ->where('jisr_task_id', $task->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        $attachmentPaths = collect($existingSubmission?->attachments ?? [])->values()->all();
+
+        $uploadedFiles = collect($request->allFiles())
+            ->flatten()
+            ->filter(fn ($file) => $file instanceof UploadedFile)
+            ->values();
+
+        if ($uploadedFiles->isNotEmpty()) {
+            foreach ($uploadedFiles as $file) {
                 $path = $file->store('jisr_attachments', 'public');
                 $attachmentPaths[] = [
                     'name' => $file->getClientOriginalName(),
@@ -106,6 +128,15 @@ class JisrController extends Controller
                     'status' => $submission->status,
                     'score' => $submission->score,
                     'feedback' => $submission->feedback,
+                    'attachments' => collect($submission->attachments ?? [])->values()->map(function ($attachment) {
+                        $path = (string) ($attachment['path'] ?? '');
+
+                        return [
+                            'name' => $attachment['name'] ?? basename($path),
+                            'path' => $path,
+                            'url' => $path !== '' ? Storage::disk('public')->url($path) : null,
+                        ];
+                    })->values(),
                 ],
                 'program_completed' => false,
                 'next_path' => null,

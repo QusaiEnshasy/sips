@@ -13,6 +13,8 @@ class SkillTestResult extends Model
     protected $fillable = [
         'user_id',
         'skill_test_id',
+        'specialization_code',
+        'specialization_name',
         'score',
         'passed',
         'answers',

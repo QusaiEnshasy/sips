@@ -1,4 +1,4 @@
-@extends('supervisor.layouts.app')
+﻿@extends('supervisor.layouts.app')
 
 @section('title', 'تقييم برنامج الجسر')
 
@@ -102,29 +102,141 @@
         line-height: 1.8;
     }
 
-    .attachment-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
+    .student-solution-wrap {
+        display: grid;
+        gap: 14px;
     }
 
-    .attachment-chip {
+    .student-files-inline {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px;
+    }
+
+    .student-files-inline__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .student-files-inline__title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .student-files-inline__count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .attachment-list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .attachment-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid #dbe4ff;
+        background: #ffffff;
+    }
+
+    .attachment-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .attachment-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #eef2ff;
+        color: #4338ca;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .attachment-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: #0f172a;
+        word-break: break-word;
+    }
+
+    .attachment-meta {
+        color: #64748b;
+        font-size: 12px;
+        margin-top: 2px;
+    }
+
+    .attachment-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .attachment-action {
         display: inline-flex;
         align-items: center;
         gap: 6px;
         padding: 8px 12px;
         border-radius: 999px;
-        background: #eef2ff;
-        color: #4338ca;
-        text-decoration: none;
         font-size: 13px;
-        font-weight: 600;
-        max-width: 100%;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all .2s ease;
     }
 
-    .attachment-chip:hover {
+    .attachment-action-view {
+        background: #eef2ff;
+        color: #4338ca;
+    }
+
+    .attachment-action-view:hover {
         background: #e0e7ff;
         color: #312e81;
+    }
+
+    .attachment-action-download {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .attachment-action-download:hover {
+        background: #bbf7d0;
+        color: #14532d;
+    }
+
+    .attachment-empty {
+        background: #fff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 14px;
+        padding: 14px;
+        color: #64748b;
     }
 
     .jisr-form-card {
@@ -169,6 +281,20 @@
 
         .jisr-actions-header > * {
             width: 100%;
+        }
+
+        .attachment-card {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .attachment-actions {
+            justify-content: stretch;
+        }
+
+        .attachment-actions > * {
+            flex: 1;
+            justify-content: center;
         }
     }
 </style>
@@ -273,10 +399,93 @@
                     <div class="col-12 col-xl-7">
                         <div class="jisr-panel mb-3">
                             <div class="jisr-panel-title">حل الطالب</div>
-                            <div class="jisr-answer-box">{{ $submission['content'] ?: 'لا يوجد نص مرفق.' }}</div>
+                            <div class="student-solution-wrap">
+                                <div class="jisr-answer-box">{{ $submission['content'] ?: 'لا يوجد نص مرفق.' }}</div>
+
+                                <div class="student-files-inline">
+                                    <div class="student-files-inline__header">
+                                        <div class="student-files-inline__title">الملفات المرفوعة</div>
+                                        <span class="student-files-inline__count">{{ collect($submission['attachments'] ?? [])->count() }} ملف</span>
+                                    </div>
+
+                                    @if(collect($submission['attachments'] ?? [])->isNotEmpty())
+                                        <div class="attachment-list">
+                                            @foreach($submission['attachments'] as $attachment)
+                                                <div class="attachment-card">
+                                                    <div class="attachment-info">
+                                                        <div class="attachment-icon">
+                                                            <i class="bi bi-file-earmark-arrow-up"></i>
+                                                        </div>
+                                                        <div>
+                                                            <div class="attachment-name">{{ $attachment['name'] ?? 'File attachment' }}</div>
+                                                            <div class="attachment-meta">تم رفعه مع حل الطالب</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="attachment-actions">
+                                                        @if(!empty($attachment['view_url']))
+                                                            <a class="attachment-action attachment-action-view" href="{{ $attachment['view_url'] }}" target="_blank" rel="noopener noreferrer">
+                                                                <i class="bi bi-eye"></i>
+                                                                فتح
+                                                            </a>
+                                                        @endif
+                                                        @if(!empty($attachment['download_url']))
+                                                            <a class="attachment-action attachment-action-download" href="{{ $attachment['download_url'] }}">
+                                                                <i class="bi bi-download"></i>
+                                                                تنزيل
+                                                            </a>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <div class="attachment-empty">لم يقم الطالب برفع ملفات مع هذا الحل.</div>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
 
-                        @if(!empty($submission['attachments']))
+                        <div class="jisr-panel mb-3 d-none">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                <div class="jisr-panel-title mb-0">&#1575;&#1604;&#1605;&#1604;&#1601;&#1575;&#1578; &#1575;&#1604;&#1605;&#1585;&#1601;&#1608;&#1593;&#1577;</div>
+                                <span class="badge rounded-pill text-bg-light">{{ collect($submission['attachments'] ?? [])->count() }} &#1605;&#1604;&#1601;</span>
+                            </div>
+                            @if(collect($submission['attachments'] ?? [])->isNotEmpty())
+                                <div class="attachment-list">
+                                    @foreach($submission['attachments'] as $attachment)
+                                        <div class="attachment-card">
+                                            <div class="attachment-info">
+                                                <div class="attachment-icon">
+                                                    <i class="bi bi-file-earmark-arrow-up"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="attachment-name">{{ $attachment['name'] ?? 'File attachment' }}</div>
+                                                    <div class="attachment-meta">&#1578;&#1605; &#1585;&#1601;&#1593;&#1607; &#1605;&#1593; &#1581;&#1604; &#1575;&#1604;&#1591;&#1575;&#1604;&#1576;</div>
+                                                </div>
+                                            </div>
+                                            <div class="attachment-actions">
+                                                @if(!empty($attachment['view_url']))
+                                                    <a class="attachment-action attachment-action-view" href="{{ $attachment['view_url'] }}" target="_blank" rel="noopener noreferrer">
+                                                        <i class="bi bi-eye"></i>
+                                                        &#1601;&#1578;&#1581;
+                                                    </a>
+                                                @endif
+                                                @if(!empty($attachment['download_url']))
+                                                    <a class="attachment-action attachment-action-download" href="{{ $attachment['download_url'] }}">
+                                                        <i class="bi bi-download"></i>
+                                                        &#1578;&#1606;&#1586;&#1610;&#1604;
+                                                    </a>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="attachment-empty">&#1604;&#1605; &#1610;&#1602;&#1605; &#1575;&#1604;&#1591;&#1575;&#1604;&#1576; &#1576;&#1585;&#1601;&#1593; &#1605;&#1604;&#1601;&#1575;&#1578; &#1605;&#1593; &#1607;&#1584;&#1575; &#1575;&#1604;&#1581;&#1604;.</div>
+                            @endif
+                        </div>
+
+                        @if(false && !empty($submission['attachments']))
                             <div class="jisr-panel">
                                 <div class="jisr-panel-title">المرفقات</div>
                                 <div class="attachment-list">
@@ -354,3 +563,5 @@
     @endforelse
 </div>
 @endsection
+
+

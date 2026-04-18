@@ -370,7 +370,7 @@ class TrainingTaskController extends Controller
     {
         $this->authorizeApplication($request, $application);
         $this->ensureTrainingOpen($application);
-        abort_unless(in_array($request->user()->role, ['company', 'supervisor', 'admin'], true), 403);
+        abort_unless(in_array($request->user()->role, ['supervisor', 'admin'], true), 403);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],

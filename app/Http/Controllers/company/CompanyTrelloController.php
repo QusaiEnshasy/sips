@@ -4,16 +4,21 @@ namespace App\Http\Controllers\company;
 
 use App\Http\Controllers\Controller;
 use App\Models\InternshipOpportunity;
+use App\Models\Task;
 use App\Models\TrelloIntegration;
 use App\Models\TrelloInternshipLink;
 use App\Services\TrelloService;
+use App\Services\TrelloTaskSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class CompanyTrelloController extends Controller
 {
-    public function __construct(private readonly TrelloService $trello)
+    public function __construct(
+        private readonly TrelloService $trello,
+        private readonly TrelloTaskSyncService $syncService
+    )
     {
     }
 
@@ -33,6 +38,7 @@ class CompanyTrelloController extends Controller
             'status' => 'success',
             'data' => [
                 'has_trello' => (bool) $integration,
+                'integration_id' => $integration?->id,
                 'board_id' => $integration?->trello_board_id,
                 'board_name' => $integration?->trello_board_name,
                 'member_id' => $integration?->trello_member_id,
@@ -78,6 +84,9 @@ class CompanyTrelloController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Trello settings saved successfully.',
+            'data' => [
+                'member_id' => $integration->trello_member_id,
+            ],
         ]);
     }
 
@@ -145,6 +154,7 @@ class CompanyTrelloController extends Controller
                 'list_name' => $link->trello_list_name,
                 'last_sync' => optional($link->last_synced_at)->toISOString(),
                 'sync_status' => $link->sync_status,
+                'sync_url' => route('company.trello.sync', ['internshipId' => $link->opportunity_id]),
             ];
         })->values();
 
@@ -180,7 +190,7 @@ class CompanyTrelloController extends Controller
             [
                 'trello_list_id' => $validated['list_id'],
                 'trello_list_name' => $validated['list_name'] ?? null,
-                'sync_status' => 'ناجح',
+                'sync_status' => 'idle',
             ]
         );
 
@@ -197,12 +207,12 @@ class CompanyTrelloController extends Controller
             ->where('opportunity_id', $internshipId)
             ->firstOrFail();
 
-        $link->update(['sync_status' => 'قيد_المزامنة']);
+        $link->update(['sync_status' => 'syncing']);
 
         try {
-            $result = $this->trello->syncOpportunityCards($link);
+            $result = $this->syncService->syncInternshipLink($link);
         } catch (\Throwable $e) {
-            $link->update(['sync_status' => 'فشل']);
+            $link->update(['sync_status' => 'failed']);
             throw $e;
         }
 
@@ -220,9 +230,49 @@ class CompanyTrelloController extends Controller
 
         if ($integration) {
             $integration->internshipLinks()->delete();
+            $integration->forceFill([
+                'trello_board_id' => null,
+                'trello_board_name' => null,
+                'trello_member_id' => null,
+                'webhook_id' => null,
+                'is_active' => false,
+            ])->save();
             $integration->delete();
         }
 
         return response()->json(['status' => 'success', 'message' => 'Trello disconnected.']);
+    }
+
+    public function unlinkInternship(int $internshipId): JsonResponse
+    {
+        $companyId = $this->companyUserId();
+        $integration = TrelloIntegration::query()->where('company_user_id', $companyId)->firstOrFail();
+
+        $link = TrelloInternshipLink::query()
+            ->where('trello_integration_id', $integration->id)
+            ->where('opportunity_id', $internshipId)
+            ->firstOrFail();
+
+        Task::query()
+            ->where('trello_integration_id', $integration->id)
+            ->whereIn('application_id', function ($query) use ($internshipId) {
+                $query->select('id')
+                    ->from('applications')
+                    ->where('opportunity_id', $internshipId);
+            })
+            ->where('source', 'trello')
+            ->update([
+                'trello_integration_id' => null,
+                'trello_list_id' => null,
+                'source' => 'manual',
+                'trello_last_synced_at' => now(),
+            ]);
+
+        $link->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Internship link disconnected successfully.',
+        ]);
     }
 }
