@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -10,8 +11,13 @@ class Task extends Model
 {
     protected $fillable = [
         'application_id',
+        'company_user_id',
+        'trello_integration_id',
         'created_by',
         'trello_card_id',
+        'trello_list_id',
+        'source',
+        'trello_last_synced_at',
         'title',
         'details',
         'student_solution',
@@ -26,6 +32,7 @@ class Task extends Model
 
     protected $casts = [
         'due_date' => 'date',
+        'trello_last_synced_at' => 'datetime',
     ];
 
     public function application(): BelongsTo
@@ -38,6 +45,16 @@ class Task extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'company_user_id');
+    }
+
+    public function trelloIntegration(): BelongsTo
+    {
+        return $this->belongsTo(TrelloIntegration::class);
+    }
+
     public function comments(): HasMany
     {
         return $this->hasMany(Comment::class);
@@ -46,6 +63,12 @@ class Task extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(Attachment::class);
+    }
+
+    public function assignedStudents(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'task_assignments', 'task_id', 'student_id')
+            ->withTimestamps();
     }
 }
 

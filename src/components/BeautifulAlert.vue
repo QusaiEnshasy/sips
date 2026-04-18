@@ -1,26 +1,26 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5)">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-          <div class="modal-header" :class="headerClass">
-            <h5 class="modal-title">
-              <i :class="iconClass" class="me-2"></i>
-              {{ title }}
-            </h5>
-            <button type="button" class="btn-close" @click="close" aria-label="Close"></button>
+    <div v-if="show" class="alert-overlay" tabindex="-1" @click.self="close">
+      <div class="alert-dialog">
+        <div class="alert-card">
+          <button type="button" class="close-btn" @click="close" aria-label="Close">
+            <i class="bi bi-x-lg"></i>
+          </button>
+
+          <div class="alert-icon-wrap" :style="{ background: modalConfig.iconBg }">
+            <i :class="modalConfig.iconClass" class="alert-icon" :style="{ color: modalConfig.iconColor }"></i>
           </div>
-          <div class="modal-body text-center py-4">
-            <div class="mb-3">
-              <i :class="iconClass" :style="{ fontSize: '3rem', color: iconColor }"></i>
-            </div>
-            <p class="mb-0 fs-5">{{ message }}</p>
+
+          <div class="alert-content">
+            <h5 class="alert-title">{{ title }}</h5>
+            <p class="alert-message">{{ message }}</p>
           </div>
-          <div class="modal-footer justify-content-center border-0 pb-4">
-            <button type="button" class="btn" :class="buttonClass" @click="confirm">
+
+          <div class="alert-actions">
+            <button type="button" class="btn action-btn" :class="modalConfig.buttonClass" @click="confirm">
               {{ confirmText }}
             </button>
-            <button v-if="showCancel" type="button" class="btn btn-secondary ms-2" @click="close">
+            <button v-if="showCancel" type="button" class="btn btn-light action-btn border" @click="close">
               {{ cancelText }}
             </button>
           </div>
@@ -31,99 +31,145 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { computed, defineEmits, defineProps } from 'vue'
 
 const props = defineProps({
-  show: {
-    type: Boolean,
-    default: false
-  },
-  title: {
-    type: String,
-    default: 'تنبيه'
-  },
-  message: {
-    type: String,
-    default: ''
-  },
+  show: { type: Boolean, default: false },
+  title: { type: String, default: 'Are you sure you want to logout?' },
+  message: { type: String, default: '' },
   type: {
     type: String,
-    default: 'info', // success, error, warning, info
+    default: 'info',
     validator: (value) => ['success', 'error', 'warning', 'info'].includes(value)
   },
-  confirmText: {
-    type: String,
-    default: 'موافق'
-  },
-  cancelText: {
-    type: String,
-    default: 'إلغاء'
-  },
-  showCancel: {
-    type: Boolean,
-    default: false
-  }
+  confirmText: { type: String, default: 'Logout' },
+  cancelText: { type: String, default: 'Cancel' },
+  showCancel: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['confirm', 'close'])
 
 const typeConfig = {
   success: {
-    headerClass: 'bg-success text-white',
     iconClass: 'bi bi-check-circle-fill',
-    iconColor: '#198754',
+    iconColor: '#1f9254',
+    iconBg: 'rgba(31, 146, 84, 0.12)',
     buttonClass: 'btn-success'
   },
   error: {
-    headerClass: 'bg-danger text-white',
     iconClass: 'bi bi-x-circle-fill',
-    iconColor: '#dc3545',
+    iconColor: '#c73636',
+    iconBg: 'rgba(199, 54, 54, 0.12)',
     buttonClass: 'btn-danger'
   },
   warning: {
-    headerClass: 'bg-warning text-dark',
     iconClass: 'bi bi-exclamation-triangle-fill',
-    iconColor: '#ffc107',
+    iconColor: '#cf7f00',
+    iconBg: 'rgba(207, 127, 0, 0.14)',
     buttonClass: 'btn-warning'
   },
   info: {
-    headerClass: 'bg-info text-white',
     iconClass: 'bi bi-info-circle-fill',
-    iconColor: '#0dcaf0',
-    buttonClass: 'btn-info'
+    iconColor: '#1976d2',
+    iconBg: 'rgba(25, 118, 210, 0.12)',
+    buttonClass: 'btn-primary'
   }
 }
 
-const config = computed(() => typeConfig[props.type] || typeConfig.info)
+const modalConfig = computed(() => typeConfig[props.type] || typeConfig.info)
 
-const { headerClass, iconClass, iconColor, buttonClass } = config.value
-
-const confirm = () => {
-  emit('confirm')
-}
-
-const close = () => {
-  emit('close')
-}
+const confirm = () => emit('confirm')
+const close = () => emit('close')
 </script>
 
 <style scoped>
-.modal-content {
-  border-radius: 1rem;
+.alert-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 22, 39, 0.48);
+  backdrop-filter: blur(5px);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
 }
 
-.modal-header {
-  border-radius: 1rem 1rem 0 0;
+.alert-dialog {
+  width: 100%;
+  max-width: 450px;
+}
+
+.alert-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 28px 24px 22px;
+  text-align: center;
+}
+
+.close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
   border: none;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #475569;
 }
 
-.modal-body {
-  padding: 2rem;
+.alert-icon-wrap {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.btn {
-  border-radius: 0.5rem;
-  padding: 0.5rem 2rem;
-  font-weight: 500;
+.alert-icon {
+  font-size: 2.25rem;
+}
+
+.alert-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.alert-message {
+  margin-bottom: 0;
+  color: #475569;
+  font-size: 1.03rem;
+  line-height: 1.7;
+}
+
+.alert-actions {
+  margin-top: 22px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.action-btn {
+  min-width: 120px;
+  border-radius: 10px;
+  font-weight: 600;
+  padding: 10px 16px;
+}
+
+@media (max-width: 576px) {
+  .alert-actions {
+    flex-direction: column;
+  }
+
+  .action-btn {
+    width: 100%;
+  }
 }
 </style>

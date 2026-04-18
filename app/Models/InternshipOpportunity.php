@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class InternshipOpportunity extends Model
@@ -34,6 +35,11 @@ class InternshipOpportunity extends Model
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class, 'opportunity_id');
+    }
+
+    public function trelloLink(): HasOne
+    {
+        return $this->hasOne(TrelloInternshipLink::class, 'opportunity_id');
     }
 
     public function getTitleAttribute($value): ?string

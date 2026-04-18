@@ -13,6 +13,7 @@ use App\Models\JisrTask;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use App\Services\NotificationService;
 
@@ -20,6 +21,19 @@ class SupervisorController extends Controller
 {
     private function buildJisrReviewsPayload(User $supervisor): array
     {
+        // Prevent hard failures on environments where Jisr tables are not migrated yet.
+        if (! Schema::hasTable('jisr_submissions') || ! Schema::hasTable('jisr_tasks')) {
+            return [
+                'stats' => [
+                    'total_submissions' => 0,
+                    'pending_reviews' => 0,
+                    'accepted_submissions' => 0,
+                    'rejected_submissions' => 0,
+                ],
+                'submissions' => collect(),
+            ];
+        }
+
         $submissions = JisrSubmission::with(['task', 'user'])
             ->whereHas('user', function ($query) use ($supervisor) {
                 $query->where('role', 'student')
@@ -71,13 +85,15 @@ class SupervisorController extends Controller
                         'max_score' => $task?->max_score,
                         'order_number' => $task?->order_number,
                     ],
-                    'attachments' => collect($submission->attachments ?? [])->map(function ($attachment) {
+                    'attachments' => collect($submission->attachments ?? [])->values()->map(function ($attachment, $index) use ($submission) {
                         $path = (string) ($attachment['path'] ?? '');
 
                         return [
                             'name' => $attachment['name'] ?? basename($path),
                             'path' => $path,
                             'url' => $path ? Storage::disk('public')->url($path) : null,
+                            'view_url' => $path ? route('supervisor.jisr-attachments.show', ['submission' => $submission->id, 'index' => $index]) : null,
+                            'download_url' => $path ? route('supervisor.jisr-attachments.download', ['submission' => $submission->id, 'index' => $index]) : null,
                         ];
                     })->values(),
                 ];
@@ -114,13 +130,22 @@ class SupervisorController extends Controller
             return back()->with('error', 'You are not the supervisor of this student.');
         }
 
-        $student->status = 'active';
-        $student->skill_test_required = true;
-        $student->skill_test_passed = false;
-        $student->is_in_jisr = false;
-        $student->skill_test_completed_at = null;
-        $student->jisr_completed_at = null;
-        $student->save();
+        $updates = ['status' => 'active'];
+        $optionalColumns = [
+            'skill_test_required' => true,
+            'skill_test_passed' => false,
+            'is_in_jisr' => false,
+            'skill_test_completed_at' => null,
+            'jisr_completed_at' => null,
+        ];
+
+        foreach ($optionalColumns as $column => $value) {
+            if (Schema::hasColumn('users', $column)) {
+                $updates[$column] = $value;
+            }
+        }
+
+        $student->forceFill($updates)->save();
 
         $this->notifications->notifyUser(
             userId: $id,
@@ -259,10 +284,6 @@ class SupervisorController extends Controller
                 ->latest()
                 ->first();
 
-            if (! $application || ! $application->approved_at) {
-                return null;
-            }
-
             $progress = 0;
             $statusLabel = 'On Track';
 
@@ -282,7 +303,7 @@ class SupervisorController extends Controller
                 'progress'     => $progress,
                 'status_label' => $statusLabel,
             ];
-        })->filter()->values();
+        })->values();
 
         $totalStudents = User::where('role', 'student')
             ->where('supervisor_code', $supervisor->supervisor_code)
@@ -481,6 +502,45 @@ class SupervisorController extends Controller
             'status' => 'success',
             'data' => $payload,
         ]);
+    }
+
+    public function showJisrAttachment(Request $request, int $submission, int $index)
+    {
+        return $this->serveJisrAttachment($request, $submission, $index, false);
+    }
+
+    public function downloadJisrAttachment(Request $request, int $submission, int $index)
+    {
+        return $this->serveJisrAttachment($request, $submission, $index, true);
+    }
+
+    private function serveJisrAttachment(Request $request, int $submissionId, int $index, bool $asDownload)
+    {
+        $this->ensureRole();
+
+        $supervisor = $request->user();
+        abort_unless($supervisor && $supervisor->role === 'supervisor', 403);
+        abort_if($index < 0, 404);
+
+        $submission = JisrSubmission::with('user')->findOrFail($submissionId);
+        $student = $submission->user;
+        abort_unless($student && $student->supervisor_code === $supervisor->supervisor_code, 403);
+
+        $attachments = collect($submission->attachments ?? [])->values();
+        $attachment = $attachments->get($index);
+        abort_if(! is_array($attachment), 404);
+
+        $path = (string) ($attachment['path'] ?? '');
+        abort_if($path === '' || ! Storage::disk('public')->exists($path), 404);
+
+        $fileName = (string) ($attachment['name'] ?? basename($path));
+        $safeName = trim(basename($fileName)) !== '' ? basename($fileName) : basename($path);
+
+        if ($asDownload) {
+            return Storage::disk('public')->download($path, $safeName);
+        }
+
+        return Storage::disk('public')->response($path, $safeName);
     }
 
     public function reviewJisrSubmission(Request $request, int $id): JsonResponse|RedirectResponse

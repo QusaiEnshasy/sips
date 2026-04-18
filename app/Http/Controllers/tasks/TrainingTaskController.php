@@ -5,6 +5,8 @@ namespace App\Http\Controllers\tasks;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\Task;
+use App\Models\TrelloIntegration;
+use App\Models\TrelloInternshipLink;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\TrainingEvaluationNotifier;
@@ -100,6 +102,7 @@ class TrainingTaskController extends Controller
 
             $task = Task::create([
                 'application_id' => $application->id,
+                'company_user_id' => (int) optional($application->opportunity)->company_user_id,
                 'created_by' => $request->user()->id,
                 'title' => trim($validated['title']),
                 'details' => $validated['details'] ?: null,
@@ -107,17 +110,31 @@ class TrainingTaskController extends Controller
                 'label' => $validated['label'] ?: null,
                 'assigned_user' => $application->student?->name,
                 'status' => 'todo',
+                'source' => 'manual',
                 'order' => (Task::where('application_id', $application->id)->where('status', 'todo')->max('order') ?? 0) + 1,
             ]);
 
-            $card = $this->trello->createCard(
-                listId: $this->statusToTrelloListId('todo'),
-                name: '[' . ($application->student?->name ?? 'Student') . '] ' . $task->title,
-                desc: (string) ($task->details ?? '')
-            );
+            $this->attachTaskToStudent($task, $application->student_id ? (int) $application->student_id : null);
 
-            if (! empty($card['id'])) {
-                $task->update(['trello_card_id' => $card['id']]);
+            $integration = $this->resolveCompanyIntegration($application);
+            $link = $this->resolveInternshipLink($application, $integration);
+            if ($integration && $link) {
+                $card = $this->trello->createCard(
+                    listId: (string) $link->trello_list_id,
+                    name: '[' . ($application->student?->name ?? 'Student') . '] ' . $task->title,
+                    desc: (string) ($task->details ?? ''),
+                    integration: $integration
+                );
+
+                if (! empty($card['id'])) {
+                    $task->update([
+                        'trello_card_id' => $card['id'],
+                        'trello_list_id' => (string) ($card['idList'] ?? $link->trello_list_id),
+                        'trello_integration_id' => $integration->id,
+                        'source' => 'trello',
+                        'trello_last_synced_at' => now(),
+                    ]);
+                }
             }
 
             if ($application->student_id) {
@@ -167,6 +184,7 @@ class TrainingTaskController extends Controller
 
             $task = Task::create([
                 'application_id' => $application->id,
+                'company_user_id' => (int) optional($application->opportunity)->company_user_id,
                 'created_by' => $request->user()->id,
                 'title' => trim($validated['title']),
                 'details' => $validated['details'] ?: null,
@@ -174,17 +192,31 @@ class TrainingTaskController extends Controller
                 'label' => $validated['label'] ?: null,
                 'assigned_user' => $application->student?->name,
                 'status' => 'todo',
+                'source' => 'manual',
                 'order' => (Task::where('application_id', $application->id)->where('status', 'todo')->max('order') ?? 0) + 1,
             ]);
 
-            $card = $this->trello->createCard(
-                listId: $this->statusToTrelloListId('todo'),
-                name: '[' . ($application->student?->name ?? 'Student') . '] ' . $task->title,
-                desc: (string) ($task->details ?? '')
-            );
+            $this->attachTaskToStudent($task, $application->student_id ? (int) $application->student_id : null);
 
-            if (! empty($card['id'])) {
-                $task->update(['trello_card_id' => $card['id']]);
+            $integration = $this->resolveCompanyIntegration($application);
+            $link = $this->resolveInternshipLink($application, $integration);
+            if ($integration && $link) {
+                $card = $this->trello->createCard(
+                    listId: (string) $link->trello_list_id,
+                    name: '[' . ($application->student?->name ?? 'Student') . '] ' . $task->title,
+                    desc: (string) ($task->details ?? ''),
+                    integration: $integration
+                );
+
+                if (! empty($card['id'])) {
+                    $task->update([
+                        'trello_card_id' => $card['id'],
+                        'trello_list_id' => (string) ($card['idList'] ?? $link->trello_list_id),
+                        'trello_integration_id' => $integration->id,
+                        'source' => 'trello',
+                        'trello_last_synced_at' => now(),
+                    ]);
+                }
             }
 
             if ($application->student_id) {
@@ -229,6 +261,40 @@ class TrainingTaskController extends Controller
             'done' => (string) config('services.trello.done_list_id', ''),
             default => '',
         };
+    }
+
+    private function resolveCompanyIntegration(Application $application): ?TrelloIntegration
+    {
+        $companyId = (int) optional($application->opportunity)->company_user_id;
+        if ($companyId <= 0) {
+            return null;
+        }
+
+        return TrelloIntegration::query()
+            ->where('company_user_id', $companyId)
+            ->where('is_active', true)
+            ->first();
+    }
+
+    private function resolveInternshipLink(Application $application, ?TrelloIntegration $integration): ?TrelloInternshipLink
+    {
+        if (! $integration) {
+            return null;
+        }
+
+        return TrelloInternshipLink::query()
+            ->where('trello_integration_id', $integration->id)
+            ->where('opportunity_id', (int) $application->opportunity_id)
+            ->first();
+    }
+
+    private function attachTaskToStudent(Task $task, ?int $studentId): void
+    {
+        if (! $studentId) {
+            return;
+        }
+
+        $task->assignedStudents()->syncWithoutDetaching([$studentId]);
     }
 
     private function ensureTrainingOpen(Application $application): void
@@ -276,8 +342,16 @@ class TrainingTaskController extends Controller
             'creator:id,name,role',
             'comments.user:id,name,role',
             'attachments.user:id,name,role',
-        ])->where('application_id', $application->id)
-            ->orderBy('order')
+            'assignedStudents:id,name',
+        ])->where('application_id', $application->id);
+
+        if ($request->user()->role === 'student') {
+            $tasks->whereHas('assignedStudents', function (Builder $query) use ($request) {
+                $query->where('users.id', $request->user()->id);
+            });
+        }
+
+        $tasks = $tasks->orderBy('order')
             ->orderBy('id')
             ->get();
 
@@ -307,6 +381,7 @@ class TrainingTaskController extends Controller
 
         $task = Task::create([
             'application_id' => $application->id,
+            'company_user_id' => (int) optional($application->opportunity)->company_user_id,
             'created_by' => $request->user()->id,
             'title' => trim($validated['title']),
             'details' => $validated['details'] ?: null,
@@ -314,17 +389,31 @@ class TrainingTaskController extends Controller
             'label' => $validated['label'] ?: null,
             'assigned_user' => $application->student?->name,
             'status' => 'todo',
+            'source' => 'manual',
             'order' => (Task::where('application_id', $application->id)->where('status', 'todo')->max('order') ?? 0) + 1,
         ]);
 
-        $card = $this->trello->createCard(
-            listId: $this->statusToTrelloListId('todo'),
-            name: $task->title,
-            desc: (string) ($task->details ?? '')
-        );
+        $this->attachTaskToStudent($task, $application->student_id ? (int) $application->student_id : null);
 
-        if (! empty($card['id'])) {
-            $task->update(['trello_card_id' => $card['id']]);
+        $integration = $this->resolveCompanyIntegration($application);
+        $link = $this->resolveInternshipLink($application, $integration);
+        if ($integration && $link) {
+            $card = $this->trello->createCard(
+                listId: (string) $link->trello_list_id,
+                name: $task->title,
+                desc: (string) ($task->details ?? ''),
+                integration: $integration
+            );
+
+            if (! empty($card['id'])) {
+                $task->update([
+                    'trello_card_id' => $card['id'],
+                    'trello_list_id' => (string) ($card['idList'] ?? $link->trello_list_id),
+                    'trello_integration_id' => $integration->id,
+                    'source' => 'trello',
+                    'trello_last_synced_at' => now(),
+                ]);
+            }
         }
 
         $this->notifications->notifyUser(
@@ -368,15 +457,11 @@ class TrainingTaskController extends Controller
             ]);
         }
 
-        if ($task->trello_card_id) {
+        $integration = $this->resolveCompanyIntegration($application);
+        if ($task->trello_card_id && $integration) {
             $this->trello->updateCard($task->trello_card_id, [
                 'desc' => "Solution:\n" . $task->student_solution,
-            ]);
-
-            $listId = $this->statusToTrelloListId($task->status);
-            if ($listId !== '') {
-                $this->trello->moveCard($task->trello_card_id, $listId);
-            }
+            ], $integration);
         }
 
         $recipients = [];

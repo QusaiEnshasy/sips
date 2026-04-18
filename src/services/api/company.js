@@ -31,6 +31,13 @@ export const companyAPI = {
   acceptApplicant: (id) => webApi.post(`/company/applications/${id}/approve`),
   rejectApplicant: (id, data) => webApi.post(`/company/applications/${id}/reject`, data || {}),
   getReports: () => webApi.get('/company/reports/data'),
-  getTrelloSettings: () => Promise.resolve({ data: { status: 'success', data: {} } }),
-  saveTrelloSettings: (data) => Promise.resolve({ data: { status: 'success', data } })
+  getTrelloSettings: () => webApi.get('/company/trello/settings'),
+  saveTrelloSettings: (data) => webApi.post('/company/trello/settings', data),
+  testTrelloConnection: () => webApi.post('/company/trello/test'),
+  getTrelloBoards: () => webApi.get('/company/trello/boards'),
+  getTrelloLists: (boardId) => webApi.get(`/company/trello/boards/${boardId}/lists`),
+  getTrelloIntegrations: () => webApi.get('/company/trello/integrations'),
+  connectTrelloBoard: (internshipId, data) => webApi.post(`/company/trello/internships/${internshipId}/connect`, data),
+  syncTrello: (internshipId) => webApi.post(`/company/trello/internships/${internshipId}/sync`),
+  disconnectTrello: () => webApi.delete('/company/trello/disconnect')
 }

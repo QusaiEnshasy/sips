@@ -304,6 +304,68 @@
                 padding: 80px 16px 40px 16px;
             }
         }
+
+        .logout-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .45);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 16px;
+        }
+
+        .logout-modal-overlay.show {
+            display: flex;
+        }
+
+        .logout-modal-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, .2);
+            text-align: center;
+            padding: 26px 22px 20px;
+        }
+
+        .logout-modal-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 14px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            color: #dc2626;
+            background: rgba(220, 38, 38, .12);
+        }
+
+        .logout-modal-title {
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .logout-modal-text {
+            color: var(--text-muted);
+            margin-bottom: 18px;
+        }
+
+        .logout-modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .logout-modal-actions .btn {
+            min-width: 120px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
     </style>
 
     @stack('styles')
@@ -319,6 +381,20 @@
     <main class="main-content">
         @yield('content')
     </main>
+
+    <div class="logout-modal-overlay" id="logoutConfirmModal">
+        <div class="logout-modal-card">
+            <div class="logout-modal-icon">
+                <i class="bi bi-box-arrow-right"></i>
+            </div>
+            <h5 class="logout-modal-title">تأكيد تسجيل الخروج</h5>
+            <p class="logout-modal-text">هل أنت متأكد أنك تريد تسجيل الخروج؟</p>
+            <div class="logout-modal-actions">
+                <button type="button" class="btn btn-danger" id="confirmLogoutAction">تسجيل الخروج</button>
+                <button type="button" class="btn btn-light border" id="cancelLogoutAction">إلغاء</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const htmlElement = document.documentElement;
@@ -524,6 +600,68 @@
             });
         });
 
+    </script>
+
+    <script>
+        (function() {
+            let pendingLogoutForm = null;
+
+            function byId(id) {
+                return document.getElementById(id);
+            }
+
+            function openLogoutModal(form) {
+                const modal = byId('logoutConfirmModal');
+                if (!modal) return;
+                pendingLogoutForm = form || byId('supervisorLogoutForm');
+                modal.classList.add('show');
+            }
+
+            function closeLogoutModal() {
+                const modal = byId('logoutConfirmModal');
+                if (!modal) return;
+                modal.classList.remove('show');
+                pendingLogoutForm = null;
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const logoutBtn = byId('supervisorLogoutBtn');
+                const logoutForm = byId('supervisorLogoutForm');
+                const modal = byId('logoutConfirmModal');
+                const confirmBtn = byId('confirmLogoutAction');
+                const cancelBtn = byId('cancelLogoutAction');
+
+                if (!modal || !confirmBtn || !cancelBtn) return;
+
+                if (logoutBtn && logoutForm) {
+                    logoutBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        openLogoutModal(logoutForm);
+                    });
+                }
+
+                document.addEventListener('submit', function(e) {
+                    const form = e.target;
+                    if (!(form instanceof HTMLFormElement)) return;
+                    if (form.method.toUpperCase() !== 'POST') return;
+                    const action = (form.getAttribute('action') || '').toLowerCase();
+                    if (!action.endsWith('/logout')) return;
+                    e.preventDefault();
+                    openLogoutModal(form);
+                }, true);
+
+                cancelBtn.addEventListener('click', closeLogoutModal);
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) closeLogoutModal();
+                });
+
+                confirmBtn.addEventListener('click', function() {
+                    if (pendingLogoutForm) {
+                        pendingLogoutForm.submit();
+                    }
+                });
+            });
+        })();
     </script>
 
     @stack('scripts')

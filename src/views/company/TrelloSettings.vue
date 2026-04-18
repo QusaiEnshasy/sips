@@ -144,10 +144,10 @@
                 <span><i class="bi bi-kanban me-1"></i> {{ int.board_name }}</span>
                 <span class="mx-2">•</span>
                 <span><i class="bi bi-arrow-repeat me-1"></i> {{ t('last_sync') }}: {{ formatDate(int.last_sync) }}</span>
-                <span v-if="int.sync_status === 'قيد_المزامنة'" class="text-warning ms-2">
+                <span v-if="int.sync_status === 'syncing'" class="text-warning ms-2">
                   <i class="bi bi-hourglass-split"></i> {{ t('syncing') }}
                 </span>
-                <span v-else-if="int.sync_status === 'ناجح'" class="text-success ms-2">
+                <span v-else-if="int.sync_status === 'success'" class="text-success ms-2">
                   <i class="bi bi-check-circle"></i> {{ t('synced') }}
                 </span>
                 <span v-else class="text-danger ms-2">
@@ -267,10 +267,8 @@ const connectionStatusIcon = computed(() => {
 const loadSettings = async () => {
   try {
     const response = await companyAPI.getTrelloSettings()
-    if (response.data.data?.has_trello) {
-      apiKey.value = '••••••••••••••••'
-      apiToken.value = '••••••••••••••••'
-    }
+    apiKey.value = response.data.data?.has_trello ? '' : apiKey.value
+    apiToken.value = ''
   } catch (error) {
     console.error('Failed to load Trello settings:', error)
   }
@@ -310,7 +308,7 @@ const loadInternships = async () => {
 }
 
 const saveSettings = async () => {
-  if (!apiKey.value || !apiToken.value) {
+  if (!apiToken.value) {
     connectionStatus.value = t('fill_api_credentials')
     connectionStatusClass.value = 'text-danger'
     return
@@ -384,6 +382,7 @@ const connectInternship = async () => {
     await companyAPI.connectTrelloBoard(selectedInternshipId.value, {
       board_id: selectedBoardId.value,
       list_id: selectedListId.value,
+      list_name: lists.value.find((l) => l.id === selectedListId.value)?.name || null,
       board_name: selectedBoard.value?.name
     })
     alert(t('connected_successfully'))

@@ -42,8 +42,14 @@ class LoginController extends Controller
             return $adminResponse;
         }
 
-        $field = filter_var($identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'university_id';
-        $user = User::where($field, $identifier)->first();
+        if (filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+            $user = User::where('email', $identifier)->first();
+        } else {
+            // Accept either university_id or exact email-like identifiers (e.g., "admin").
+            $user = User::where('university_id', $identifier)
+                ->orWhere('email', $identifier)
+                ->first();
+        }
 
         if (! $user) {
             return back()->with('error', 'هذا الحساب غير موجود أو تم حذفه.')->withInput();
@@ -80,12 +86,12 @@ class LoginController extends Controller
 
     private function attemptBootstrapAdminLogin(Request $request, string $identifier, string $password, string $throttleKey)
     {
-        $adminIdentifier = trim((string) env('LOCAL_ADMIN_IDENTIFIER', ''));
-        $adminPassword = (string) env('LOCAL_ADMIN_PASSWORD', '');
-
-        if (! App::isLocal() || $adminIdentifier === '' || $adminPassword === '') {
+        if (! App::isLocal()) {
             return null;
         }
+
+        $adminIdentifier = trim((string) env('LOCAL_ADMIN_IDENTIFIER', 'admin'));
+        $adminPassword = (string) env('LOCAL_ADMIN_PASSWORD', 'admin123');
 
         if ($identifier !== $adminIdentifier || ! hash_equals($adminPassword, $password)) {
             return null;

@@ -6,12 +6,12 @@
     </button>
 
     <!-- Logo Section -->
-    <router-link to="/" class="logo-area">
+    <div class="logo-area" aria-label="Application icon">
       <div class="brand-icon">
         <i class="bi bi-mortarboard-fill"></i>
       </div>
       <span class="fw-bold fs-5">{{ t('brand') }}</span>
-    </router-link>
+    </div>
 
     <!-- القائمة حسب نوع المستخدم -->
     <div v-for="(section, index) in menuSections" :key="index">
@@ -383,3 +383,4 @@ hr {
   }
 }
 </style>
+

@@ -36,12 +36,13 @@
 
     <div style="margin-top: auto;">
         <hr class="opacity-25" />
-        <form method="POST" action="{{ route('logout') }}">
+        <form method="POST" action="{{ route('logout') }}" id="supervisorLogoutForm">
             @csrf
-            <button type="submit" class="nav-link-custom text-danger border-0 bg-transparent w-100 text-start">
+            <button type="button" id="supervisorLogoutBtn" class="nav-link-custom text-danger border-0 bg-transparent w-100 text-start">
                 <i class="bi bi-box-arrow-left"></i>
                 <span>تسجيل الخروج</span>
             </button>
         </form>
     </div>
 </nav>
+
