@@ -38,5 +38,10 @@ class TrelloIntegration extends Model
     {
         return $this->hasMany(TrelloInternshipLink::class);
     }
+
+    public function syncLogs(): HasMany
+    {
+        return $this->hasMany(TrelloSyncLog::class);
+    }
 }
 

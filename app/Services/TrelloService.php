@@ -13,8 +13,13 @@ class TrelloService
     private function resolveCredentials(?TrelloIntegration $integration = null): array
     {
         if ($integration) {
+            $integrationKey = trim((string) $integration->trello_api_key);
+            if ($integrationKey === '' || str_contains($integrationKey, '@')) {
+                $integrationKey = (string) config('services.trello.key');
+            }
+
             return [
-                'key' => (string) ($integration->trello_api_key ?: config('services.trello.key')),
+                'key' => $integrationKey,
                 'token' => (string) $integration->trello_token,
             ];
         }
@@ -201,6 +206,28 @@ class TrelloService
         }
 
         return $this->delete("/cards/{$cardId}", [], $integration);
+    }
+
+    public function createWebhook(string $callbackUrl, string $idModel, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $callbackUrl === '' || $idModel === '') {
+            return [];
+        }
+
+        return $this->post('/webhooks', [
+            'description' => 'SIP company Trello sync webhook',
+            'callbackURL' => $callbackUrl,
+            'idModel' => $idModel,
+        ], $integration);
+    }
+
+    public function deleteWebhook(string $webhookId, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $webhookId === '') {
+            return [];
+        }
+
+        return $this->delete("/webhooks/{$webhookId}", [], $integration);
     }
 
     public function getMemberProfile(?TrelloIntegration $integration = null): array

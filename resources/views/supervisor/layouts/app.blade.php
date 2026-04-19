@@ -5,6 +5,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@yield('title', 'Supervisor Dashboard')</title>
+    <script>
+        (function() {
+            const lang = localStorage.getItem('lang') || 'ar';
+            document.documentElement.lang = lang;
+            document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+        })();
+    </script>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
@@ -68,6 +75,18 @@
             flex-direction: column;
             transition: .3s;
             z-index: 1050;
+        }
+
+        [dir="rtl"] .sidebar {
+            right: 0;
+            left: auto;
+            border-right: 0;
+            border-left: 1px solid var(--border-color);
+        }
+
+        [dir="rtl"] .mobile-menu-toggle {
+            left: auto;
+            right: 20px;
         }
 
         .brand-logo {
@@ -291,6 +310,11 @@
                 transform: translateX(-100%);
                 width: 240px;
                 box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+            }
+
+            [dir="rtl"] .sidebar {
+                transform: translateX(100%);
+                box-shadow: -2px 0 20px rgba(0, 0, 0, 0.1);
             }
 
             .sidebar.show {
@@ -533,28 +557,125 @@
             }
         };
 
+        Object.assign(bladeTranslations.ar, {
+            brand: 'ترين إيد',
+            platform: 'منصة التدريب',
+            dashboard: 'لوحة التحكم',
+            applications: 'الطلبات',
+            students: 'الطلاب',
+            pending_students: 'الطلاب المعلقون',
+            weekly_tasks: 'المهام الأسبوعية',
+            notifications: 'الإشعارات',
+            jisr_reviews: 'تقييم برنامج الجسر',
+            logout: 'تسجيل الخروج',
+            logout_confirm_title: 'تأكيد تسجيل الخروج',
+            logout_confirm_text: 'هل أنت متأكد أنك تريد تسجيل الخروج؟',
+            cancel: 'إلغاء',
+            supervisor_dashboard: 'لوحة المشرف',
+            monitor_students: 'تابع طلابك وطلبات القبول وسير التدريب النشط.',
+            total_students: 'إجمالي الطلاب',
+            pending: 'قيد الانتظار',
+            active: 'نشط',
+            rejected: 'مرفوض',
+            all_linked_students: 'كل الطلاب المرتبطين',
+            awaiting_approval: 'بانتظار الاعتماد',
+            active_students: 'الطلاب النشطون',
+            rejected_students: 'الطلاب المرفوضون',
+            approved_training_students: 'طلاب التدريب المعتمدون',
+            approved_training_subtitle: 'الطلاب الذين لديهم طلبات تدريب معتمدة تحت إشرافك.',
+            view_all_students: 'عرض كل الطلاب',
+            progress: 'التقدم',
+            open_board: 'فتح اللوحة',
+            details: 'التفاصيل',
+            no_approved_students: 'لا يوجد طلاب معتمدون حاليا.',
+            student_applications: 'طلبات الطلاب',
+            review_applications: 'راجع الطلبات التي قدمها طلابك إلى الشركات',
+            total_applications: 'إجمالي الطلبات',
+            all_student_requests: 'كل طلبات الطلاب',
+            waiting_review: 'بانتظار مراجعتك',
+            supervisor_approved: 'وافق المشرف',
+            supervisor_rejected: 'رفض المشرف',
+            applications_table: 'جدول الطلبات',
+            only_linked_students: 'تظهر هنا فقط الطلبات المقدمة من الطلاب المرتبطين بكود المشرف الخاص بك',
+            student: 'الطالب',
+            company_opportunity: 'الشركة / الفرصة',
+            company_status: 'حالة الشركة',
+            supervisor_status: 'حالة المشرف',
+            final_status: 'الحالة النهائية',
+            actions: 'الإجراءات',
+            approved: 'مقبول',
+            pending_status: 'قيد الانتظار',
+            reject: 'رفض',
+            approve: 'قبول',
+            decision_submitted: 'تم إرسال القرار مسبقا',
+            no_applications: 'لا توجد طلبات لطلابك',
+            pending_students_title: 'الطلاب المعلقون',
+            pending_students_subtitle: 'وافق أو ارفض الطلاب الجدد المرتبطين بكود المشرف الخاص بك',
+            name: 'الاسم',
+            university_id: 'الرقم الجامعي',
+            email: 'البريد الإلكتروني',
+            phone: 'الهاتف',
+            status: 'الحالة',
+            supervisor_code: 'كود المشرف',
+            no_pending_students: 'لا يوجد طلاب معلقون.',
+            students_title: 'الطلاب',
+            students_subtitle: 'إدارة الطلاب المرتبطين بكود المشرف ومراجعة حالتهم الحالية.',
+            approved_students: 'الطلاب المقبولون',
+            approved_students_subtitle: 'الطلاب الذين أصبحت حساباتهم نشطة تحت إشرافك.',
+            rejected_students_title: 'الطلاب المرفوضون',
+            rejected_students_subtitle: 'الطلاب الذين تم رفض طلبات حساباتهم.',
+            program: 'البرنامج'
+        });
+
+        Object.assign(bladeTranslations.en, {
+            notifications: 'Notifications',
+            jisr_reviews: 'Jisr Program Review',
+            logout_confirm_title: 'Confirm Logout',
+            logout_confirm_text: 'Are you sure you want to log out?',
+            cancel: 'Cancel'
+        });
+
         function applyBladeLanguage(lang) {
             localStorage.setItem('lang', lang);
             htmlElement.lang = lang;
             htmlElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+            document.body.classList.toggle('rtl', lang === 'ar');
+            document.body.classList.toggle('ltr', lang === 'en');
             document.querySelectorAll('[data-i18n]').forEach((element) => {
                 const key = element.dataset.i18n;
-                if (bladeTranslations[lang][key]) {
+                if (bladeTranslations[lang] && bladeTranslations[lang][key]) {
                     element.textContent = bladeTranslations[lang][key];
                 }
             });
             document.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
                 const key = element.dataset.i18nPlaceholder;
-                if (bladeTranslations[lang][key]) {
+                if (bladeTranslations[lang] && bladeTranslations[lang][key]) {
                     element.setAttribute('placeholder', bladeTranslations[lang][key]);
                 }
             });
+            const logoutTitle = document.querySelector('.logout-modal-title');
+            const logoutText = document.querySelector('.logout-modal-text');
+            const confirmLogout = document.getElementById('confirmLogoutAction');
+            const cancelLogout = document.getElementById('cancelLogoutAction');
+            if (logoutTitle && bladeTranslations[lang]?.logout_confirm_title) {
+                logoutTitle.textContent = bladeTranslations[lang].logout_confirm_title;
+            }
+            if (logoutText && bladeTranslations[lang]?.logout_confirm_text) {
+                logoutText.textContent = bladeTranslations[lang].logout_confirm_text;
+            }
+            if (confirmLogout && bladeTranslations[lang]?.logout) {
+                confirmLogout.textContent = bladeTranslations[lang].logout;
+            }
+            if (cancelLogout && bladeTranslations[lang]?.cancel) {
+                cancelLogout.textContent = bladeTranslations[lang].cancel;
+            }
             const enBtn = document.getElementById('langSwitchEn');
             const arBtn = document.getElementById('langSwitchAr');
             if (enBtn && arBtn) {
                 enBtn.classList.toggle('active', lang === 'en');
                 arBtn.classList.toggle('active', lang === 'ar');
             }
+            window.dispatchEvent(new CustomEvent('app-language-changed', { detail: { lang } }));
         }
 
         function toggleTheme() {

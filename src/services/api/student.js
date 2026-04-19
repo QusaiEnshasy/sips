@@ -19,6 +19,8 @@ export const studentAPI = {
   getSkillTest: (specialization = null) => webApi.get('/student/skill-test/data', {
     params: specialization ? { specialization } : {}
   }),
+  startSkillTest: (data) => webApi.post('/student/skill-test/start', data),
+  saveSkillTestProgress: (data) => webApi.post('/student/skill-test/progress', data),
   submitTestResult: (_testId, data) => webApi.post('/student/skill-test/submit', data),
   getJisrTasks: () => webApi.get('/student/jisr/tasks'),
   submitJisrTask: (taskId, data) => webApi.post(`/student/jisr/tasks/${taskId}/submit`, data, {

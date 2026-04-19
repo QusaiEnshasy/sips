@@ -274,7 +274,9 @@ const questions = ref([])
 const answers = ref({})
 const testResult = ref(null)
 const timeLeft = ref(0)
+const activeAttempt = ref(null)
 let timerInterval = null
+let progressSaveTimer = null
 
 const text = {
   ar: {
@@ -374,6 +376,7 @@ const selectedSpecializationName = computed(() => selectedSpecializationMeta.val
 const applyTestPayload = (data) => {
   specializations.value = data.specializations || []
   selectedSpecialization.value = data.selected_specialization || selectedSpecialization.value
+  activeAttempt.value = data.active_attempt || activeAttempt.value
 
   test.value = data.test
     ? {
@@ -394,6 +397,15 @@ const applyTestPayload = (data) => {
     options: question.options,
     correct_answer: question.correct_answer
   }))
+
+  if (data.active_attempt?.status === 'in_progress') {
+    answers.value = data.active_attempt.answers || {}
+    timeLeft.value = data.active_attempt.remaining_seconds || secondsUntil(data.active_attempt.expires_at)
+    testStarted.value = true
+    testCompleted.value = false
+    startTimer()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
 const fallbackSpecializations = () => ([
@@ -501,33 +513,78 @@ const chooseSpecialization = async (code) => {
   await loadTest(code)
 }
 
-const startTest = () => {
+const startTest = async () => {
   if (!selectedSpecialization.value) {
     window.alert(labels.value.chooseSpecializationFirst)
     return
   }
 
-  answers.value = {}
-  testStarted.value = true
-  timeLeft.value = (test.value?.duration_minutes || 30) * 60
-  startTimer()
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  isLoadingQuestions.value = true
+
+  try {
+    const response = await studentAPI.startSkillTest({
+      test_id: test.value.id,
+      specialization_code: selectedSpecialization.value
+    })
+    activeAttempt.value = response.data?.data?.attempt || null
+    answers.value = activeAttempt.value?.answers || {}
+    timeLeft.value = activeAttempt.value?.remaining_seconds || secondsUntil(activeAttempt.value?.expires_at)
+    testStarted.value = true
+    testCompleted.value = false
+    startTimer()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  } catch (error) {
+    console.error('Failed to start test:', error)
+    window.alert(error.response?.data?.message || labels.value.chooseSpecializationFirst)
+  } finally {
+    isLoadingQuestions.value = false
+  }
 }
 
 const startTimer = () => {
+  if (timerInterval) clearInterval(timerInterval)
   timerInterval = setInterval(() => {
-    if (timeLeft.value > 0) {
+    if (activeAttempt.value?.expires_at) {
+      timeLeft.value = secondsUntil(activeAttempt.value.expires_at)
+    } else if (timeLeft.value > 0) {
       timeLeft.value -= 1
+    }
+
+    if (timeLeft.value > 0) {
       return
     }
 
     clearInterval(timerInterval)
-    submitTest()
+    submitTest({ force: true })
   }, 1000)
 }
 
 const selectAnswer = (questionIndex, answerIndex) => {
   answers.value[questionIndex] = answerIndex
+  queueSaveProgress()
+}
+
+const secondsUntil = (dateValue) => {
+  if (!dateValue) return 0
+  return Math.max(0, Math.floor((new Date(dateValue).getTime() - Date.now()) / 1000))
+}
+
+const queueSaveProgress = () => {
+  if (!activeAttempt.value?.id) return
+  if (progressSaveTimer) clearTimeout(progressSaveTimer)
+
+  progressSaveTimer = setTimeout(async () => {
+    try {
+      await studentAPI.saveSkillTestProgress({
+        attempt_id: activeAttempt.value.id,
+        answers: answers.value
+      })
+    } catch (error) {
+      if (error.response?.status !== 409) {
+        console.error('Failed to save skill test progress:', error)
+      }
+    }
+  }, 500)
 }
 
 const scrollToQuestion = (index) => {
@@ -537,13 +594,14 @@ const scrollToQuestion = (index) => {
   }
 }
 
-const submitTest = async () => {
-  if (Object.keys(answers.value).length < questions.value.length && !window.confirm(labels.value.partialSubmitConfirm)) {
+const submitTest = async ({ force = false } = {}) => {
+  if (!force && Object.keys(answers.value).length < questions.value.length && !window.confirm(labels.value.partialSubmitConfirm)) {
     return
   }
 
   isSubmitting.value = true
   if (timerInterval) clearInterval(timerInterval)
+  if (progressSaveTimer) clearTimeout(progressSaveTimer)
 
   try {
     let correctCount = 0
@@ -557,6 +615,7 @@ const submitTest = async () => {
     const payload = {
       test_id: test.value.id,
       specialization_code: selectedSpecialization.value,
+      attempt_id: activeAttempt.value?.id,
       score: percentage,
       answers: answers.value,
       completed_at: new Date().toISOString()
@@ -577,6 +636,7 @@ const submitTest = async () => {
     }
     testCompleted.value = true
     testStarted.value = false
+    activeAttempt.value = null
   } catch (error) {
     console.error('Failed to submit test:', error)
 
@@ -594,6 +654,7 @@ const submitTest = async () => {
     }
     testCompleted.value = true
     testStarted.value = false
+    activeAttempt.value = null
   } finally {
     isSubmitting.value = false
   }
@@ -610,6 +671,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval)
+  if (progressSaveTimer) clearTimeout(progressSaveTimer)
 })
 </script>
 

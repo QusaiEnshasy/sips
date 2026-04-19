@@ -46,6 +46,25 @@
         </div>
       </div>
 
+      <div class="trello-hub mb-5" data-aos="fade-up">
+        <div class="trello-hub-content">
+          <div class="trello-mark">
+            <i class="bi bi-trello"></i>
+          </div>
+          <div>
+            <p class="eyebrow mb-1">Trello للشركة</p>
+            <h4 class="fw-bold mb-2">اربط Trello وزامن مهام الشركة</h4>
+            <p class="mb-0 text-muted">
+              اربط لوحة Trello الحقيقية، اختر القائمة الخاصة بكل برنامج تدريب، ثم زامن البطاقات لتظهر كمهام للطلاب داخل النظام.
+            </p>
+          </div>
+        </div>
+        <button class="btn-trello-primary" @click="openTrelloSettings">
+          <i class="bi bi-plug me-2"></i>
+          فتح تكامل Trello
+        </button>
+      </div>
+
       <!-- Stats Cards -->
       <div class="row g-4 mb-5">
         <div class="col-sm-6 col-md-3" v-for="stat in stats" :key="stat.key">
@@ -399,6 +418,63 @@ onMounted(() => {
 <style scoped>
 .company-dashboard { padding: 20px 0; }
 
+.trello-hub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(0, 121, 191, 0.18), transparent 35%),
+    linear-gradient(135deg, #f0f9ff, #ffffff 48%, #eef2ff);
+  border: 1px solid rgba(0, 121, 191, 0.18);
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.trello-hub-content {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.trello-mark {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0079bf, #026aa7);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  flex-shrink: 0;
+}
+
+.eyebrow {
+  color: #0079bf;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.btn-trello-primary {
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0079bf, #005f94);
+  color: white;
+  padding: 13px 22px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 12px 24px rgba(0, 121, 191, 0.24);
+}
+
+.btn-trello-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(0, 121, 191, 0.32);
+}
+
 .error-state {
   background: var(--card-bg);
   border-radius: 24px;
@@ -605,6 +681,15 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .company-dashboard { padding: 15px; }
+  .trello-hub,
+  .trello-hub-content {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .btn-trello-primary {
+    width: 100%;
+    justify-content: center;
+  }
   .stat-card { padding: 20px; }
   .table-responsive {
     margin: 0 -15px;

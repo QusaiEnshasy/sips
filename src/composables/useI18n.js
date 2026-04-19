@@ -10,6 +10,7 @@ import enStudent from '@/locales/en/student.json'
 import enShared from '@/locales/en/shared.json'
 import enCompany from '@/locales/en/company.json'
 import enErrors from '@/locales/en/errors.json'
+import enOverrides from '@/locales/en/overrides.json'
 
 import arCommon from '@/locales/ar/common.json'
 import arAuth from '@/locales/ar/auth.json'
@@ -19,6 +20,7 @@ import arStudent from '@/locales/ar/student.json'
 import arShared from '@/locales/ar/shared.json'
 import arCompany from '@/locales/ar/company.json'
 import arErrors from '@/locales/ar/errors.json'
+import arOverrides from '@/locales/ar/overrides.json'
 
 const enTranslations = {
   ...enCommon,
@@ -28,7 +30,8 @@ const enTranslations = {
   ...enStudent,
   ...enShared,
   ...enCompany,
-  ...enErrors
+  ...enErrors,
+  ...enOverrides
 }
 
 const arTranslations = {
@@ -39,10 +42,22 @@ const arTranslations = {
   ...arStudent,
   ...arShared,
   ...arCompany,
-  ...arErrors
+  ...arErrors,
+  ...arOverrides
 }
 
 const currentLang = ref(localStorage.getItem('lang') || 'ar')
+
+const applyLanguageToDocument = (lang) => {
+  document.documentElement.lang = lang
+  document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
+  document.body?.classList.toggle('rtl', lang === 'ar')
+  document.body?.classList.toggle('ltr', lang === 'en')
+}
+
+if (typeof document !== 'undefined') {
+  applyLanguageToDocument(currentLang.value)
+}
 
 const formatDate = (date, formatStr = 'PPP') => {
   if (!date) return ''
@@ -67,15 +82,24 @@ const timeAgo = (date) => {
 export function useI18n() {
   const t = (key, params = {}) => {
     const forcedTranslations = {
-      jisr_program: 'برنامج الجسر',
-      start_jisr_program: 'ابدأ برنامج الجسر',
-      complete_tasks_to_advance: 'أكمل مهام برنامج الجسر للانتقال إلى المرحلة التالية',
-      jisr_description: 'هذا المسار التأهيلي يساعدك على تطوير مهاراتك قبل العودة إلى المسار الأساسي',
-      program_progress: 'تقدم البرنامج'
+      ar: {
+        jisr_program: 'برنامج الجسر',
+        start_jisr_program: 'ابدأ برنامج الجسر',
+        complete_tasks_to_advance: 'أكمل مهام برنامج الجسر للانتقال إلى المرحلة التالية',
+        jisr_description: 'هذا المسار التأهيلي يساعدك على تطوير مهاراتك قبل العودة إلى المسار الأساسي',
+        program_progress: 'تقدم البرنامج'
+      },
+      en: {
+        jisr_program: 'Jisr Program',
+        start_jisr_program: 'Start Jisr Program',
+        complete_tasks_to_advance: 'Complete Jisr tasks to move to the next stage',
+        jisr_description: 'This preparation path helps you improve your skills before returning to the main track',
+        program_progress: 'Program Progress'
+      }
     }
 
-    if (forcedTranslations[key]) {
-      return forcedTranslations[key]
+    if (forcedTranslations[currentLang.value]?.[key]) {
+      return forcedTranslations[currentLang.value][key]
     }
 
     const translations = currentLang.value === 'ar' ? arTranslations : enTranslations
@@ -99,17 +123,8 @@ export function useI18n() {
     if (lang === 'ar' || lang === 'en') {
       currentLang.value = lang
       localStorage.setItem('lang', lang)
-
-      document.documentElement.lang = lang
-      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr'
-
-      if (lang === 'ar') {
-        document.body.classList.add('rtl')
-        document.body.classList.remove('ltr')
-      } else {
-        document.body.classList.add('ltr')
-        document.body.classList.remove('rtl')
-      }
+      applyLanguageToDocument(lang)
+      window.dispatchEvent(new CustomEvent('app-language-changed', { detail: { lang } }))
     }
   }
 

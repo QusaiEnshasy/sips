@@ -26,7 +26,7 @@
           @click="closeSidebarOnMobile"
         >
           <i :class="item.icon"></i>
-          <span v-text="item.label || t(item.key)"></span>
+          <span v-text="t(item.key)"></span>
         </router-link>
       </nav>
     </div>
@@ -100,11 +100,11 @@ const menuSections = computed(() => {
       {
         title: 'menu',
         items: [
-          { path: '/supervisor/dashboard', icon: 'bi bi-grid', key: 'dashboard', label: 'لوحة التحكم' },
-          { path: '/supervisor/students', icon: 'bi bi-people', key: 'students', label: 'الطلاب' },
-          { path: '/supervisor/jisr-reviews', icon: 'bi bi-clipboard-check', key: 'jisr_reviews', label: 'تقييم برنامج الجسر' },
-          { path: '/supervisor/weekly-tasks', icon: 'bi bi-bar-chart-steps', key: 'weekly_tasks', label: 'المهام الأسبوعية' },
-          { path: '/notifications', icon: 'bi bi-bell', key: 'notifications', label: 'الإشعارات' }
+          { path: '/supervisor/dashboard', icon: 'bi bi-grid', key: 'dashboard' },
+          { path: '/supervisor/students', icon: 'bi bi-people', key: 'students' },
+          { path: '/supervisor/jisr-reviews', icon: 'bi bi-clipboard-check', key: 'jisr_reviews' },
+          { path: '/supervisor/weekly-tasks', icon: 'bi bi-bar-chart-steps', key: 'weekly_tasks' },
+          { path: '/notifications', icon: 'bi bi-bell', key: 'notifications' }
         ]
       }
     ],
@@ -115,7 +115,7 @@ const menuSections = computed(() => {
           {
             title: 'menu',
             items: [
-              { path: '/student/jisr', icon: 'bi bi-mortarboard', key: 'jisr_program', label: 'برنامج الجسر' },
+              { path: '/student/jisr', icon: 'bi bi-mortarboard', key: 'jisr_program' },
               { path: '/notifications', icon: 'bi bi-bell', key: 'notifications' }
             ]
           }

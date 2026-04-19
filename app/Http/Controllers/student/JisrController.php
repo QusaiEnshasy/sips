@@ -46,6 +46,7 @@ class JisrController extends Controller
                         'status' => $submission->status,
                         'score' => $submission->score,
                         'feedback' => $submission->feedback,
+                        'content' => $submission->content,
                         'submitted_at' => optional($submission->submitted_at)->toISOString(),
                         'attachments' => collect($submission->attachments ?? [])->values()->map(function ($attachment) {
                             $path = (string) ($attachment['path'] ?? '');

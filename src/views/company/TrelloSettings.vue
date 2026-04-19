@@ -8,13 +8,13 @@
             <i class="bi bi-trello"></i>
           </div>
           <div>
-            <h2 class="fw-bold mb-2">{{ t('trello_integration') }}</h2>
-            <p class="text-muted mb-0">{{ t('connect_trello_manage_tasks') }}</p>
+            <h2 class="fw-bold mb-2">تكامل Trello</h2>
+            <p class="text-muted mb-0">اربط حساب Trello الخاص بالشركة وزامن البطاقات كمهام للطلاب.</p>
           </div>
         </div>
         <router-link to="/company/dashboard" class="btn-back">
           <i class="bi bi-arrow-left me-2"></i>
-          {{ t('back_dashboard') }}
+          العودة للوحة التحكم
         </router-link>
       </div>
     </div>
@@ -25,30 +25,31 @@
         <div class="settings-card" data-aos="fade-up">
           <div class="card-header-custom">
             <i class="bi bi-key"></i>
-            <h5 class="fw-bold mb-0">{{ t('api_settings') }}</h5>
+            <h5 class="fw-bold mb-0">إعدادات الربط</h5>
           </div>
           
           <div class="alert-info mb-4">
             <i class="bi bi-info-circle me-2"></i>
-            {{ t('trello_api_help') }}
+            تحتاج الشركة إلى Token من حساب Trello الخاص بها. يمكن ترك API Key فارغًا لاستخدام مفتاح النظام.
             <a href="https://trello.com/power-ups/admin" target="_blank" class="ms-2">
-              {{ t('get_api_key') }} <i class="bi bi-box-arrow-up-right"></i>
+              فتح Trello Power-Ups <i class="bi bi-box-arrow-up-right"></i>
             </a>
           </div>
           
           <div class="mb-3">
-            <label class="form-label fw-bold">{{ t('api_key') }}</label>
+            <label class="form-label fw-bold">API Key <span class="text-muted small">(اختياري)</span></label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-key"></i></span>
-              <input type="text" class="form-control" v-model="apiKey" :placeholder="t('enter_api_key')">
+              <input type="text" class="form-control" v-model="apiKey" placeholder="اتركه فارغًا لاستخدام مفتاح النظام">
             </div>
+            <div class="form-text">لا تضع الإيميل هنا. هذه الخانة للمفتاح الطويل فقط، ويمكن تركها فارغة.</div>
           </div>
           
           <div class="mb-4">
-            <label class="form-label fw-bold">{{ t('api_token') }}</label>
+            <label class="form-label fw-bold">Token الخاص بحساب الشركة</label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-lock"></i></span>
-              <input :type="showToken ? 'text' : 'password'" class="form-control" v-model="apiToken" :placeholder="t('enter_api_token')">
+              <input :type="showToken ? 'text' : 'password'" class="form-control" v-model="apiToken" placeholder="الصق Token الذي أخذته من Trello">
               <button class="input-group-text" @click="showToken = !showToken">
                 <i :class="showToken ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
               </button>
@@ -58,11 +59,11 @@
           <div class="d-flex gap-3">
             <button class="btn-accent-gradient" @click="saveSettings" :disabled="isSaving">
               <i class="bi bi-save me-2"></i>
-              {{ t('save_settings') }}
+              حفظ الإعدادات
             </button>
             <button class="btn-outline" @click="testConnection" :disabled="isTesting">
               <i class="bi bi-plug me-2"></i>
-              {{ t('test_connection') }}
+              اختبار الاتصال
             </button>
           </div>
           
@@ -78,18 +79,18 @@
         <div class="boards-card" data-aos="fade-up" data-aos-delay="100">
           <div class="card-header-custom">
             <i class="bi bi-kanban"></i>
-            <h5 class="fw-bold mb-0">{{ t('available_boards') }}</h5>
+            <h5 class="fw-bold mb-0">اللوحات المتاحة</h5>
           </div>
           
           <div v-if="isLoadingBoards" class="text-center py-5">
             <div class="spinner-border text-primary" role="status"></div>
-            <p class="text-muted mt-3">{{ t('loading_boards') }}</p>
+            <p class="text-muted mt-3">جاري تحميل اللوحات...</p>
           </div>
           
           <div v-else-if="boards.length === 0" class="empty-state text-center py-5">
             <i class="bi bi-kanban fs-1 text-muted"></i>
-            <p class="text-muted mt-3">{{ t('no_boards_found') }}</p>
-            <p class="small text-muted">{{ t('save_api_key_first') }}</p>
+            <p class="text-muted mt-3">لا توجد لوحات ظاهرة</p>
+            <p class="small text-muted">احفظ Token صحيح أولًا، ثم اختبر الاتصال.</p>
           </div>
           
           <div v-else class="boards-list">
@@ -105,7 +106,7 @@
               </div>
               <button class="btn-accent-outline" @click="openConnectModal(board)">
                 <i class="bi bi-link me-1"></i>
-                {{ t('connect') }}
+              ربط
               </button>
             </div>
           </div>
@@ -113,11 +114,35 @@
       </div>
     </div>
 
+    <div class="automation-card mt-4" data-aos="fade-up" data-aos-delay="150">
+      <div class="automation-content">
+        <div class="automation-icon">
+          <i class="bi bi-lightning-charge"></i>
+        </div>
+        <div>
+          <h5 class="fw-bold mb-1">المزامنة التلقائية</h5>
+          <p class="text-muted mb-1">عند تفعيل Webhook، أي تغيير على Trello يشغل مزامنة تلقائية داخل النظام.</p>
+          <small class="text-muted">
+            الحالة: <strong>{{ webhookEnabled ? 'مفعلة' : 'غير مفعلة' }}</strong>
+            <span v-if="webhookCallbackUrl"> | الرابط: {{ webhookCallbackUrl }}</span>
+          </small>
+        </div>
+      </div>
+      <button v-if="!webhookEnabled" class="btn-accent-gradient" @click="enableWebhook" :disabled="isWebhookSaving">
+        <i class="bi bi-broadcast-pin me-2"></i>
+        تفعيل Webhook
+      </button>
+      <button v-else class="btn-outline text-danger" @click="disableWebhook" :disabled="isWebhookSaving">
+        <i class="bi bi-broadcast-pin me-2"></i>
+        إيقاف Webhook
+      </button>
+    </div>
+
     <!-- Connected Internships -->
     <div class="integrations-card mt-4" data-aos="fade-up" data-aos-delay="200">
       <div class="card-header-custom">
         <i class="bi bi-link-45deg"></i>
-        <h5 class="fw-bold mb-0">{{ t('connected_internships') }}</h5>
+        <h5 class="fw-bold mb-0">البرامج المرتبطة</h5>
         <span class="badge ms-2" :class="integrations.length ? 'bg-primary' : 'bg-secondary'">
           {{ integrations.length }}
         </span>
@@ -144,6 +169,12 @@
                 <span><i class="bi bi-kanban me-1"></i> {{ int.board_name }}</span>
                 <span class="mx-2">•</span>
                 <span><i class="bi bi-arrow-repeat me-1"></i> {{ t('last_sync') }}: {{ formatDate(int.last_sync) }}</span>
+                <span class="mx-2">|</span>
+                <span>
+                  جديد: {{ int.latest_log?.created_count ?? 0 }} |
+                  محدث: {{ int.latest_log?.updated_count ?? 0 }} |
+                  متخطى: {{ int.latest_log?.skipped_count ?? 0 }}
+                </span>
                 <span v-if="int.sync_status === 'syncing'" class="text-warning ms-2">
                   <i class="bi bi-hourglass-split"></i> {{ t('syncing') }}
                 </span>
@@ -166,6 +197,38 @@
             <button class="btn-icon-accent text-danger" @click="disconnectInternship(int)" :title="t('disconnect')">
               <i class="bi bi-unlink"></i>
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="integrations-card mt-4" data-aos="fade-up" data-aos-delay="250">
+      <div class="card-header-custom">
+        <i class="bi bi-clock-history"></i>
+        <h5 class="fw-bold mb-0">سجل المزامنة</h5>
+      </div>
+
+      <div v-if="syncLogs.length === 0" class="empty-state-small text-center py-4">
+        <i class="bi bi-inbox fs-3 text-muted"></i>
+        <p class="text-muted mt-2 mb-0">لا توجد عمليات مزامنة بعد.</p>
+      </div>
+
+      <div v-else class="sync-log-list">
+        <div v-for="log in syncLogs" :key="log.id" class="sync-log-item">
+          <div>
+            <div class="fw-bold">{{ log.program || 'برنامج غير محدد' }}</div>
+            <small class="text-muted">
+              {{ log.trigger === 'webhook' ? 'Webhook' : 'يدوي' }} |
+              {{ formatDate(log.finished_at || log.started_at) }}
+            </small>
+          </div>
+          <div class="sync-log-counts">
+            <span class="badge bg-success">جديد {{ log.created }}</span>
+            <span class="badge bg-primary">محدث {{ log.updated }}</span>
+            <span class="badge bg-secondary">متخطى {{ log.skipped }}</span>
+            <span class="badge" :class="log.status === 'success' ? 'bg-success' : (log.status === 'failed' ? 'bg-danger' : 'bg-warning')">
+              {{ log.status }}
+            </span>
           </div>
         </div>
       </div>
@@ -247,12 +310,16 @@ const isLoadingBoards = ref(false)
 const isLoadingIntegrations = ref(false)
 const isLoadingLists = ref(false)
 const isConnecting = ref(false)
+const isWebhookSaving = ref(false)
 const connectionStatus = ref('')
 const connectionStatusClass = ref('')
 const boards = ref([])
 const integrations = ref([])
+const syncLogs = ref([])
 const internships = ref([])
 const lists = ref([])
+const webhookEnabled = ref(false)
+const webhookCallbackUrl = ref('')
 const showConnectModal = ref(false)
 const selectedBoard = ref(null)
 const selectedBoardId = ref('')
@@ -273,6 +340,8 @@ const loadSettings = async () => {
     const settings = response.data.data || {}
     apiKey.value = settings.has_trello ? '' : apiKey.value
     apiToken.value = ''
+    webhookEnabled.value = !!settings.webhook_enabled
+    webhookCallbackUrl.value = settings.webhook_callback_url || ''
 
     if (settings.has_trello) {
       await loadBoards()
@@ -303,6 +372,15 @@ const loadIntegrations = async () => {
     console.error('Failed to load integrations:', error)
   } finally {
     isLoadingIntegrations.value = false
+  }
+}
+
+const loadSyncLogs = async () => {
+  try {
+    const response = await companyAPI.getTrelloSyncLogs()
+    syncLogs.value = response.data.data || []
+  } catch (error) {
+    console.error('Failed to load Trello sync logs:', error)
   }
 }
 
@@ -396,6 +474,7 @@ const connectInternship = async () => {
     alert(t('connected_successfully'))
     closeConnectModal()
     await loadIntegrations()
+    await loadSettings()
   } catch (error) {
     alert(error?.response?.data?.message || t('connection_failed'))
   } finally {
@@ -405,11 +484,39 @@ const connectInternship = async () => {
 
 const syncInternship = async (integration) => {
   try {
-    await companyAPI.syncTrello(integration.internship_id)
-    alert(t('sync_completed'))
+    const response = await companyAPI.syncTrello(integration.internship_id)
+    const result = response.data?.data || {}
+    alert(`تمت المزامنة: جديد ${result.created || 0}، محدث ${result.updated || 0}، متخطى ${result.skipped || 0}`)
     await loadIntegrations()
+    await loadSyncLogs()
   } catch (error) {
     alert(t('sync_failed'))
+  }
+}
+
+const enableWebhook = async () => {
+  isWebhookSaving.value = true
+  try {
+    await companyAPI.enableTrelloWebhook()
+    alert('تم تفعيل Webhook بنجاح.')
+    await loadSettings()
+  } catch (error) {
+    alert(error?.response?.data?.message || 'تعذر تفعيل Webhook. إذا كنت تعمل محليًا استخدم زر المزامنة اليدوية.')
+  } finally {
+    isWebhookSaving.value = false
+  }
+}
+
+const disableWebhook = async () => {
+  isWebhookSaving.value = true
+  try {
+    await companyAPI.disableTrelloWebhook()
+    alert('تم إيقاف Webhook.')
+    await loadSettings()
+  } catch (error) {
+    alert(error?.response?.data?.message || 'تعذر إيقاف Webhook.')
+  } finally {
+    isWebhookSaving.value = false
   }
 }
 
@@ -418,6 +525,7 @@ const disconnectInternship = async (integration) => {
     try {
       await companyAPI.unlinkTrelloInternship(integration.internship_id)
       await loadIntegrations()
+      await loadSyncLogs()
       alert(t('disconnected'))
     } catch (error) {
       alert(error?.response?.data?.message || t('disconnect_failed'))
@@ -438,6 +546,7 @@ onMounted(() => {
   AOS.init({ duration: 800, once: true })
   loadSettings()
   loadIntegrations()
+  loadSyncLogs()
   loadInternships()
 })
 </script>
@@ -477,11 +586,40 @@ onMounted(() => {
   border-color: var(--accent);
 }
 
-.settings-card, .boards-card, .integrations-card {
+.settings-card, .boards-card, .integrations-card, .automation-card {
   background: var(--card-bg);
   border-radius: 24px;
   padding: 24px;
   border: 1px solid var(--border-color);
+}
+
+.automation-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(0, 121, 191, .16), transparent 35%),
+    var(--card-bg);
+}
+
+.automation-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.automation-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0079bf, #026aa7);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
 }
 
 .card-header-custom {
@@ -663,6 +801,28 @@ onMounted(() => {
   gap: 8px;
 }
 
+.sync-log-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sync-log-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+}
+
+.sync-log-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 .empty-state {
   text-align: center;
   padding: 40px;
@@ -753,7 +913,7 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .board-item, .integration-item {
+  .board-item, .integration-item, .automation-card, .automation-content, .sync-log-item {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;

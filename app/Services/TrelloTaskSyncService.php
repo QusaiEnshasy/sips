@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\Task;
 use App\Models\TrelloInternshipLink;
+use App\Models\TrelloSyncLog;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -15,7 +17,7 @@ class TrelloTaskSyncService
     {
     }
 
-    public function syncInternshipLink(TrelloInternshipLink $link): array
+    public function syncInternshipLink(TrelloInternshipLink $link, string $trigger = 'manual'): array
     {
         $link->loadMissing(['integration.company', 'opportunity.companyUser']);
 
@@ -24,9 +26,18 @@ class TrelloTaskSyncService
             return ['created' => 0, 'updated' => 0, 'skipped' => 0];
         }
 
+        $log = TrelloSyncLog::query()->create([
+            'trello_integration_id' => $integration->id,
+            'trello_internship_link_id' => $link->id,
+            'opportunity_id' => $link->opportunity_id,
+            'trigger' => $trigger,
+            'status' => 'started',
+            'started_at' => now(),
+        ]);
+
         $boardId = (string) $integration->trello_board_id;
         if ($boardId === '') {
-            return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+            return $this->finishLog($log, ['created' => 0, 'updated' => 0, 'skipped' => 0], 'failed', 'No Trello board is linked.');
         }
 
         $applications = Application::with(['student', 'opportunity'])
@@ -38,7 +49,7 @@ class TrelloTaskSyncService
             ->get();
 
         if ($applications->isEmpty()) {
-            return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+            return $this->finishLog($log, ['created' => 0, 'updated' => 0, 'skipped' => 0], 'success', 'No active approved students for this program.');
         }
 
         $existingCardIds = Task::query()
@@ -74,14 +85,26 @@ class TrelloTaskSyncService
             ]);
             $integration->update(['last_synced_at' => now()]);
 
-            return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+            return $this->finishLog($log, ['created' => 0, 'updated' => 0, 'skipped' => 0], 'success', 'No matching Trello cards found.');
         }
 
         $counts = ['created' => 0, 'updated' => 0, 'skipped' => 0];
+        $assignmentDetails = [];
 
-        DB::transaction(function () use ($applications, $cards, $lists, $integration, $link, &$counts) {
-            foreach ($applications as $application) {
-                foreach ($cards as $card) {
+        DB::transaction(function () use ($applications, $cards, $lists, $integration, $link, &$counts, &$assignmentDetails) {
+            foreach ($cards as $card) {
+                $targetApplications = $this->resolveTargetApplications($card, $applications);
+
+                if ($targetApplications->isEmpty()) {
+                    $counts['skipped']++;
+                    $assignmentDetails[] = [
+                        'card' => $card['name'] ?? $card['id'] ?? null,
+                        'reason' => 'student marker did not match an approved student',
+                    ];
+                    continue;
+                }
+
+                foreach ($targetApplications as $application) {
                     $cardId = (string) ($card['id'] ?? '');
                     $cardName = trim((string) ($card['name'] ?? ''));
                     if ($cardId === '' || $cardName === '') {
@@ -119,6 +142,14 @@ class TrelloTaskSyncService
                         $task->assignedStudents()->syncWithoutDetaching([(int) $application->student_id]);
                     }
 
+                    $assignmentDetails[] = [
+                        'card' => $cardName,
+                        'student_id' => $application->student_id,
+                        'student_name' => $application->student?->name,
+                        'student_email' => $application->student?->email,
+                        'university_id' => $application->student?->university_id,
+                    ];
+
                     $counts[$isNew ? 'created' : 'updated']++;
                 }
             }
@@ -131,7 +162,83 @@ class TrelloTaskSyncService
             $integration->update(['last_synced_at' => now()]);
         });
 
-        return $counts;
+        return $this->finishLog($log, $counts, 'success', 'Trello sync completed.', [
+            'assignments' => $assignmentDetails,
+        ]);
+    }
+
+    private function resolveTargetApplications(array $card, Collection $applications): Collection
+    {
+        $markers = $this->extractStudentMarkers($card);
+
+        if ($markers->isEmpty()) {
+            return $applications;
+        }
+
+        return $applications->filter(function (Application $application) use ($markers) {
+            $student = $application->student;
+            if (! $student instanceof User) {
+                return false;
+            }
+
+            $candidates = collect([
+                $student->id,
+                $student->email,
+                $student->university_id,
+                $student->name,
+            ])->filter()
+                ->map(fn ($value) => Str::lower(trim((string) $value)));
+
+            return $markers->intersect($candidates)->isNotEmpty();
+        })->values();
+    }
+
+    private function extractStudentMarkers(array $card): Collection
+    {
+        $text = Str::lower(trim(((string) ($card['name'] ?? '')) . "\n" . ((string) ($card['desc'] ?? ''))));
+        if ($text === '') {
+            return collect();
+        }
+
+        $markers = collect();
+
+        preg_match_all('/(?:student|students|student_id|university_id|email)\s*[:=]\s*([^\n\r]+)/iu', $text, $matches);
+        foreach ($matches[1] ?? [] as $rawValue) {
+            collect(preg_split('/[,،;|\s]+/u', (string) $rawValue))
+                ->map(fn ($value) => trim($value, " \t\n\r\0\x0B[](){}<>"))
+                ->filter()
+                ->each(fn ($value) => $markers->push($value));
+        }
+
+        preg_match_all('/[\w.\-+]+@[\w.\-]+\.[a-z]{2,}/iu', $text, $emailMatches);
+        foreach ($emailMatches[0] ?? [] as $email) {
+            $markers->push($email);
+        }
+
+        return $markers
+            ->map(fn ($value) => Str::lower(trim((string) $value)))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    private function finishLog(TrelloSyncLog $log, array $counts, string $status, ?string $message = null, array $details = []): array
+    {
+        $log->update([
+            'status' => $status,
+            'created_count' => (int) ($counts['created'] ?? 0),
+            'updated_count' => (int) ($counts['updated'] ?? 0),
+            'skipped_count' => (int) ($counts['skipped'] ?? 0),
+            'message' => $message,
+            'details' => $details ?: null,
+            'finished_at' => now(),
+        ]);
+
+        return array_merge($counts, [
+            'status' => $status,
+            'message' => $message,
+            'log_id' => $log->id,
+        ]);
     }
 
     private function mapCardStatus(array $card, string $listId, TrelloInternshipLink $link, Collection $lists): string

@@ -4,8 +4,8 @@
     v-model="selectedLang"
     :aria-label="t('select_language')"
   >
-    <option value="en">🇬🇧 EN</option>
-    <option value="ar">🇸🇦 AR</option>
+    <option value="en">EN</option>
+    <option value="ar">AR</option>
   </select>
 </template>
 

@@ -112,8 +112,7 @@ const pageTitle = computed(() => {
     '/admin/dashboard': t('admin_dashboard'),
     '/supervisor/dashboard': t('supervisor_dashboard'),
     '/student/dashboard': t('student_dashboard'),
-    '/company/dashboard': t('company_dashboard'),
-    '/company/trello-settings': t('trello_integration')
+    '/company/dashboard': t('company_dashboard')
   }
   return titles[route.path] || t('dashboard')
 })
@@ -123,8 +122,7 @@ const pageSubtitle = computed(() => {
     '/admin/dashboard': t('manage_text'),
     '/supervisor/dashboard': t('monitor_students'),
     '/student/dashboard': t('manage_training'),
-    '/company/dashboard': t('manage_training'),
-    '/company/trello-settings': t('connect_trello_manage_tasks')
+    '/company/dashboard': t('manage_training')
   }
   return subtitles[route.path] || ''
 })
@@ -135,8 +133,7 @@ const pageIcon = computed(() => {
     '/admin/dashboard': { icon: 'bi bi-speedometer2', background: 'var(--accent)' },
     '/supervisor/dashboard': { icon: 'bi bi-grid', background: 'var(--primary-purple)' },
     '/student/dashboard': { icon: 'bi bi-mortarboard-fill', background: 'var(--accent)' },
-    '/company/dashboard': { icon: 'bi bi-building', background: '#10b981' },
-    '/company/trello-settings': { icon: 'bi bi-trello', background: '#0079bf' }
+    '/company/dashboard': { icon: 'bi bi-building', background: '#10b981' }
   }
   return icons[route.path] || { icon: 'bi bi-house', background: 'var(--accent)' }
 })

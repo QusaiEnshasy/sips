@@ -90,9 +90,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/company/trello/boards', [CompanyTrelloController::class, 'boards'])->name('company.trello.boards');
     Route::get('/company/trello/boards/{boardId}/lists', [CompanyTrelloController::class, 'lists'])->name('company.trello.lists');
     Route::get('/company/trello/integrations', [CompanyTrelloController::class, 'integrations'])->name('company.trello.integrations');
+    Route::get('/company/trello/sync-logs', [CompanyTrelloController::class, 'syncLogs'])->name('company.trello.sync-logs');
     Route::post('/company/trello/internships/{internshipId}/connect', [CompanyTrelloController::class, 'connectBoard'])->name('company.trello.connect');
     Route::post('/company/trello/internships/{internshipId}/sync', [CompanyTrelloController::class, 'syncInternship'])->name('company.trello.sync');
     Route::delete('/company/trello/internships/{internshipId}/unlink', [CompanyTrelloController::class, 'unlinkInternship'])->name('company.trello.unlink');
+    Route::post('/company/trello/webhook/enable', [CompanyTrelloController::class, 'enableWebhook'])->name('company.trello.webhook.enable');
+    Route::delete('/company/trello/webhook/disable', [CompanyTrelloController::class, 'disableWebhook'])->name('company.trello.webhook.disable');
     Route::delete('/company/trello/disconnect', [CompanyTrelloController::class, 'disconnect'])->name('company.trello.disconnect');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.mark-all-read');
@@ -121,6 +124,8 @@ Route::middleware('auth')->group(function () {
     Route::view('/student/jisr', 'spa')->name('student.jisr');
     Route::view('/student/skill-test', 'spa')->name('student.skill-test');
     Route::get('/student/skill-test/data', [SkillTestController::class, 'show'])->name('student.skill-test.data');
+    Route::post('/student/skill-test/start', [SkillTestController::class, 'start'])->name('student.skill-test.start');
+    Route::post('/student/skill-test/progress', [SkillTestController::class, 'saveProgress'])->name('student.skill-test.progress');
     Route::post('/student/skill-test/submit', [SkillTestController::class, 'submit'])->name('student.skill-test.submit');
     Route::get('/student/jisr/tasks', [JisrController::class, 'tasks'])->name('student.jisr.tasks');
     Route::post('/student/jisr/tasks/{taskId}/submit', [JisrController::class, 'submit'])->name('student.jisr.tasks.submit');

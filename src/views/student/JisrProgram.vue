@@ -54,7 +54,7 @@
               <div class="task-number">#{{ task.order_number }}</div>
               <div class="task-badge" :class="getTypeClass(task.type)">
                 <i :class="getTypeIcon(task.type)"></i>
-                {{ t(task.type) }}
+                {{ getTypeText(task.type) }}
               </div>
             </div>
 
@@ -63,17 +63,17 @@
 
             <div class="points-box mb-3">
               <i class="bi bi-award"></i>
-              <span>{{ task.max_score }} {{ t('points') }}</span>
+              <span>{{ task.max_score }} نقطة</span>
             </div>
 
             <div class="status-badge" :class="getStatusBadgeClass(task.status)">
               <i :class="getStatusIcon(task.status)"></i>
-              {{ t(getStatusText(task.status)) }}
+              {{ getStatusText(task.status) }}
             </div>
 
             <div v-if="task.status === 'accepted' || task.status === 'rejected'" class="feedback-box mt-3">
               <div class="d-flex justify-content-between mb-2">
-                <span class="fw-bold small">{{ t('score') }}</span>
+                <span class="fw-bold small">الدرجة</span>
                 <span :class="task.score >= 70 ? 'text-success' : 'text-danger'">{{ task.score }}%</span>
               </div>
               <div v-if="task.feedback" class="feedback-text">
@@ -103,14 +103,14 @@
             </div>
 
             <button class="task-action-btn mt-3" :class="getButtonClass(task.status)" 
-                    @click="handleTaskAction(task)" :disabled="isSubmitting === task.id">
+                    @click="handleTaskAction(task)" :disabled="isSubmitting === task.id || task.status === 'pending_review'">
               <span v-if="isSubmitting === task.id">
                 <span class="spinner-border spinner-border-sm me-2"></span>
                 {{ t('submitting') }}
               </span>
               <span v-else>
                 <i :class="getButtonIcon(task.status)"></i>
-                {{ t(getButtonText(task.status)) }}
+                {{ getButtonText(task.status) }}
               </span>
             </button>
           </div>
@@ -235,6 +235,7 @@ const loadTasks = async () => {
       score: t.submission?.score,
       feedback: t.submission?.feedback,
       instructions: t.instructions,
+      content: t.submission?.content || '',
       attachments: t.submission?.attachments || []
     }))
     
@@ -246,13 +247,15 @@ const loadTasks = async () => {
 }
 
 const handleTaskAction = (task) => {
-  if (task.status === 'pending') {
+  if (task.status === 'pending' || task.status === 'rejected') {
     selectedTask.value = task
-    submissionContent.value = ''
+    submissionContent.value = task.status === 'rejected' ? (task.content || '') : ''
     attachments.value = []
     showSubmitModal.value = true
-  } else if (task.status === 'accepted' || task.status === 'rejected') {
+  } else if (task.status === 'accepted') {
     alert(task.feedback || t('task_submitted_success'))
+  } else if (task.status === 'pending_review') {
+    alert(t('waiting_review'))
   }
 }
 
@@ -285,6 +288,7 @@ const submitTask = async () => {
       tasks.value[taskIndex].status = response.data?.data?.submission?.status || 'pending_review'
       tasks.value[taskIndex].score = response.data?.data?.submission?.score
       tasks.value[taskIndex].feedback = response.data?.data?.submission?.feedback || ''
+      tasks.value[taskIndex].content = submissionContent.value
       tasks.value[taskIndex].attachments = response.data?.data?.submission?.attachments || attachments.value.map(file => ({
         name: file.name,
         url: null
@@ -345,12 +349,13 @@ const getTaskStatusClass = (status) => {
 }
 const getTypeClass = (type) => ({ practical: 'badge-practical', research: 'badge-research', theoretical: 'badge-theoretical' }[type] || 'badge-practical')
 const getTypeIcon = (type) => ({ practical: 'bi bi-code-slash', research: 'bi bi-file-text', theoretical: 'bi bi-book' }[type] || 'bi bi-file')
+const getTypeText = (type) => ({ practical: 'عملي', research: 'بحثي', theoretical: 'نظري' }[type] || 'مهمة')
 const getStatusBadgeClass = (status) => ({ accepted: 'status-accepted', pending_review: 'status-review', rejected: 'status-rejected' }[status] || 'status-pending')
 const getStatusIcon = (status) => ({ accepted: 'bi bi-check-circle-fill', pending_review: 'bi bi-clock-history', rejected: 'bi bi-x-circle-fill' }[status] || 'bi bi-hourglass-split')
-const getStatusText = (status) => ({ accepted: 'accepted', pending_review: 'pending_review', rejected: 'rejected' }[status] || 'pending')
+const getStatusText = (status) => ({ accepted: 'تم الاعتماد', pending_review: 'بانتظار التقييم', rejected: 'مرفوض' }[status] || 'لم يتم التسليم')
 const getButtonClass = (status) => ({ accepted: 'btn-view', pending_review: 'btn-pending', rejected: 'btn-retry' }[status] || 'btn-submit')
 const getButtonIcon = (status) => ({ accepted: 'bi bi-eye', pending_review: 'bi bi-hourglass', rejected: 'bi bi-arrow-repeat' }[status] || 'bi bi-send')
-const getButtonText = (status) => ({ accepted: 'view_submission', pending_review: 'waiting_review', rejected: 'retry' }[status] || 'submit')
+const getButtonText = (status) => ({ accepted: 'عرض الحل', pending_review: 'بانتظار التقييم', rejected: 'إعادة التسليم' }[status] || 'تسليم الحل')
 const getFileIcon = (filename) => {
   const ext = filename.split('.').pop().toLowerCase()
   const icons = { pdf: 'bi bi-file-earmark-pdf text-danger', doc: 'bi bi-file-earmark-word text-primary', docx: 'bi bi-file-earmark-word text-primary', zip: 'bi bi-file-earmark-zip text-warning', jpg: 'bi bi-file-earmark-image text-success', png: 'bi bi-file-earmark-image text-success' }

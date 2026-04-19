@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrelloInternshipLink extends Model
 {
@@ -31,6 +32,11 @@ class TrelloInternshipLink extends Model
     public function opportunity(): BelongsTo
     {
         return $this->belongsTo(InternshipOpportunity::class, 'opportunity_id');
+    }
+
+    public function syncLogs(): HasMany
+    {
+        return $this->hasMany(TrelloSyncLog::class, 'trello_internship_link_id');
     }
 }
 

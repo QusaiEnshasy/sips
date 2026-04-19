@@ -148,7 +148,7 @@ const menuSections = computed(() => {
           { path: '/company/dashboard', icon: 'bi bi-speedometer2', label: 'dashboard' },
           { path: '/company/programs', icon: 'bi bi-journal-bookmark', label: 'programs' },
           { path: '/company/applicants', icon: 'bi bi-people', label: 'applicants' },
-          { path: '/company/trello-settings', icon: 'bi bi-trello', label: 'trello_integration' },
+          { path: '/company/trello-settings', icon: 'bi bi-trello', label: 'تكامل Trello' },
           { path: '/company/reports', icon: 'bi bi-file-earmark-bar-graph', label: 'reports' },
           { path: '/notifications', icon: 'bi bi-bell', label: 'notifications' }
         ]

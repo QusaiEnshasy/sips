@@ -1,130 +1,164 @@
 <template>
-  <div class="jisr-reviews-page">
+  <div class="jisr-reviews-page" :dir="isRTL ? 'rtl' : 'ltr'">
     <div class="page-header">
       <div>
-        <h2 class="fw-bold mb-2">تقييم حلول برنامج الجسر</h2>
-        <p class="text-muted mb-0">راجع إجابات الطلاب في برنامج الجسر، ثم اعتمد الحل أو اطلب إعادة المحاولة مع ملاحظاتك.</p>
+        <h2 class="fw-bold mb-2">{{ t('supervisor_jisr_reviews_title') }}</h2>
+        <p class="text-muted mb-0">{{ t('supervisor_jisr_reviews_subtitle') }}</p>
       </div>
     </div>
 
     <div v-if="isLoading" class="loading-state">
       <div class="spinner-border text-primary" role="status"></div>
-      <p class="text-muted mt-3 mb-0">جاري تحميل الحلول...</p>
+      <p class="text-muted mt-3 mb-0">{{ t('loading_jisr_reviews') }}</p>
     </div>
 
     <template v-else>
       <div class="stats-grid">
         <div class="stat-card">
-          <span class="stat-label">إجمالي التسليمات</span>
+          <span class="stat-label">{{ t('total_submissions') }}</span>
           <strong>{{ stats.total_submissions }}</strong>
         </div>
         <div class="stat-card warning">
-          <span class="stat-label">بانتظار التقييم</span>
+          <span class="stat-label">{{ t('pending_reviews') }}</span>
           <strong>{{ stats.pending_reviews }}</strong>
         </div>
         <div class="stat-card success">
-          <span class="stat-label">تم قبولها</span>
+          <span class="stat-label">{{ t('accepted_submissions') }}</span>
           <strong>{{ stats.accepted_submissions }}</strong>
         </div>
         <div class="stat-card danger">
-          <span class="stat-label">تحتاج إعادة</span>
+          <span class="stat-label">{{ t('rejected_submissions') }}</span>
           <strong>{{ stats.rejected_submissions }}</strong>
         </div>
       </div>
 
-      <div v-if="submissions.length === 0" class="empty-state">
+      <div v-if="studentCards.length === 0" class="empty-state">
         <i class="bi bi-inbox"></i>
-        <h5 class="fw-bold mt-3">لا توجد حلول مرسلة حاليًا</h5>
-        <p class="text-muted mb-0">بمجرد أن يرسل الطالب حله في برنامج الجسر سيظهر هنا للمراجعة.</p>
+        <h5 class="fw-bold mt-3">{{ t('no_jisr_submissions') }}</h5>
+        <p class="text-muted mb-0">{{ t('no_jisr_submissions_desc') }}</p>
       </div>
 
-      <div v-else class="submissions-grid">
-        <article v-for="submission in submissions" :key="submission.id" class="submission-card" :class="statusClass(submission.status)">
-          <div class="submission-top">
+      <div v-else class="student-cards">
+        <article
+          v-for="card in studentCards"
+          :key="card.student.id"
+          class="student-card"
+          :class="statusClass(card.status)"
+        >
+          <div class="student-card__top">
             <div>
-              <div class="student-name">{{ submission.student.name }}</div>
+              <div class="student-name">{{ card.student.name }}</div>
               <div class="student-meta">
-                <span>{{ submission.student.email }}</span>
-                <span v-if="submission.student.university_id">| {{ submission.student.university_id }}</span>
+                <span>{{ card.student.email }}</span>
+                <span v-if="card.student.university_id">| {{ card.student.university_id }}</span>
               </div>
             </div>
-            <span class="status-pill" :class="badgeClass(submission.status)">
-              {{ statusText(submission.status) }}
+            <span class="status-pill" :class="badgeClass(card.status)">
+              {{ statusText(card.status) }}
             </span>
           </div>
 
-          <div class="task-box">
-            <div class="task-title">المهمة #{{ submission.task.order_number }}: {{ submission.task.title }}</div>
-            <p class="task-description mb-2">{{ submission.task.description }}</p>
-            <small class="text-muted">الدرجة القصوى: {{ submission.task.max_score }}</small>
+          <div class="student-summary">
+            <span>{{ t('submitted_tasks') }}: {{ card.submissions.length }}</span>
+            <span>{{ t('uploaded_files') }}: {{ card.attachmentsCount }}</span>
+            <span>{{ t('approved_count') }}: {{ card.acceptedCount }}/{{ card.totalTasks }}</span>
           </div>
 
-          <div class="answer-box">
-            <div class="section-title">حل الطالب</div>
-            <p class="answer-text">{{ submission.content || 'لا يوجد نص مرفق.' }}</p>
-          </div>
+          <div class="task-list">
+            <section
+              v-for="submission in card.submissions"
+              :key="submission.id"
+              class="task-row"
+              :class="statusClass(submission.status)"
+            >
+              <div class="task-row__top">
+                <div>
+                  <div class="task-title">
+                    {{ t('task') }} #{{ submission.task?.order_number }}: {{ submission.task?.title }}
+                  </div>
+                  <p class="task-description mb-2">{{ submission.task?.description }}</p>
+                  <small class="text-muted">{{ t('max_score') }}: {{ submission.task?.max_score || 100 }}</small>
+                </div>
+                <span class="status-pill" :class="badgeClass(submission.status)">
+                  {{ statusText(submission.status) }}
+                </span>
+              </div>
 
-          <div v-if="submission.attachments?.length" class="attachments-box">
-            <div class="attachments-header">
-              <div class="section-title mb-0">المرفقات</div>
-              <span class="attachments-count">{{ submission.attachments.length }} ملف</span>
-            </div>
-            <div class="attachments-list">
-              <div
-                v-for="(attachment, index) in submission.attachments"
-                :key="index"
-                class="attachment-item"
-              >
-                <div class="attachment-item__info">
-                  <div class="attachment-item__icon">
-                    <i class="bi bi-file-earmark-arrow-up"></i>
-                  </div>
-                  <div>
-                    <div class="attachment-item__name">{{ attachment.name }}</div>
-                    <div class="attachment-item__meta">تم رفعه مع حل الطالب</div>
-                  </div>
+              <div class="answer-box">
+                <div class="section-title">{{ t('solution') }}</div>
+                <p class="answer-text">{{ submission.content || t('no_text_solution') }}</p>
+              </div>
+
+              <div v-if="submission.attachments?.length" class="attachments-box">
+                <div class="attachments-header">
+                  <div class="section-title mb-0">{{ t('solution_files') }}</div>
+                  <span class="attachments-count">{{ submission.attachments.length }} {{ t('file') }}</span>
                 </div>
 
-                <div class="attachment-item__actions">
-                  <a
-                    v-if="attachment.view_url"
-                    :href="attachment.view_url"
-                    class="attachment-btn attachment-btn--view"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                <div class="attachments-list">
+                  <div
+                    v-for="(attachment, index) in submission.attachments"
+                    :key="`${submission.id}-${index}`"
+                    class="attachment-item"
                   >
-                    <i class="bi bi-eye"></i>
-                    <span>فتح</span>
-                  </a>
-                  <a
-                    v-if="attachment.download_url"
-                    :href="attachment.download_url"
-                    class="attachment-btn attachment-btn--download"
-                  >
-                    <i class="bi bi-download"></i>
-                    <span>تنزيل</span>
-                  </a>
+                    <div class="attachment-item__info">
+                      <div class="attachment-item__icon">
+                        <i class="bi bi-file-earmark-arrow-up"></i>
+                      </div>
+                      <div>
+                        <div class="attachment-item__name">{{ attachment.name }}</div>
+                        <div class="attachment-item__meta">
+                          {{ t('uploaded_with_task') }} #{{ submission.task?.order_number }}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="attachment-item__actions">
+                      <a
+                        v-if="attachment.view_url"
+                        :href="attachment.view_url"
+                        class="attachment-btn attachment-btn--view"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <i class="bi bi-eye"></i>
+                        <span>{{ t('open') }}</span>
+                      </a>
+                      <a
+                        v-if="attachment.download_url"
+                        :href="attachment.download_url"
+                        class="attachment-btn attachment-btn--download"
+                      >
+                        <i class="bi bi-download"></i>
+                        <span>{{ t('download') }}</span>
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div class="submission-footer">
-            <div class="review-meta">
-              <span>أُرسل: {{ formatDate(submission.submitted_at) }}</span>
-              <span v-if="submission.feedback">| الملاحظة الحالية: {{ submission.feedback }}</span>
-            </div>
+              <div v-else class="attachments-box muted">
+                {{ t('no_files_for_task') }}
+              </div>
 
-            <div class="actions-row">
-              <button class="btn-review" @click="openReview(submission, 'accepted')">
-                <i class="bi bi-check-circle"></i>
-                اعتماد الحل
-              </button>
-              <button class="btn-review danger" @click="openReview(submission, 'rejected')">
-                <i class="bi bi-arrow-counterclockwise"></i>
-                طلب إعادة
-              </button>
-            </div>
+              <div class="submission-footer">
+                <div class="review-meta">
+                  <span>{{ t('submitted_at') }}: {{ formatDate(submission.submitted_at) }}</span>
+                  <span v-if="submission.feedback">| {{ t('current_feedback') }}: {{ submission.feedback }}</span>
+                </div>
+
+                <div class="actions-row">
+                  <button class="btn-review" @click="openReview(submission, 'accepted')">
+                    <i class="bi bi-check-circle"></i>
+                    {{ t('approve_task') }}
+                  </button>
+                  <button class="btn-review danger" @click="openReview(submission, 'rejected')">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    {{ t('return_task') }}
+                  </button>
+                </div>
+              </div>
+            </section>
           </div>
         </article>
       </div>
@@ -132,11 +166,15 @@
 
     <Teleport to="body">
       <div v-if="showReviewModal" class="modal-overlay" @click.self="closeModal">
-        <div class="review-modal">
+        <div class="review-modal" :dir="isRTL ? 'rtl' : 'ltr'">
           <div class="modal-header">
             <div>
-              <h5 class="fw-bold mb-1">{{ selectedStatus === 'accepted' ? 'اعتماد الحل' : 'إرجاع الحل للطالب' }}</h5>
-              <p class="text-muted small mb-0">{{ selectedSubmission?.student?.name }} - {{ selectedSubmission?.task?.title }}</p>
+              <h5 class="fw-bold mb-1">
+                {{ selectedStatus === 'accepted' ? t('approve_solution') : t('return_solution_to_student') }}
+              </h5>
+              <p class="text-muted small mb-0">
+                {{ selectedSubmission?.student?.name }} - {{ selectedSubmission?.task?.title }}
+              </p>
             </div>
             <button class="btn-icon" @click="closeModal">
               <i class="bi bi-x-lg"></i>
@@ -145,7 +183,7 @@
 
           <form class="modal-body" @submit.prevent="submitReview">
             <div v-if="selectedStatus === 'accepted'" class="mb-3">
-              <label class="form-label fw-bold">الدرجة</label>
+              <label class="form-label fw-bold">{{ t('score') }}</label>
               <input
                 v-model.number="reviewForm.score"
                 type="number"
@@ -154,23 +192,23 @@
                 class="form-control"
                 required
               >
-              <small class="text-muted">الحد الأعلى {{ selectedSubmission?.task?.max_score || 100 }}</small>
+              <small class="text-muted">{{ t('maximum') }} {{ selectedSubmission?.task?.max_score || 100 }}</small>
             </div>
 
             <div class="mb-3">
-              <label class="form-label fw-bold">ملاحظات المشرف</label>
+              <label class="form-label fw-bold">{{ t('supervisor_feedback') }}</label>
               <textarea
                 v-model="reviewForm.feedback"
                 class="form-control"
                 rows="5"
-                :placeholder="selectedStatus === 'accepted' ? 'اكتب ملاحظتك للطالب بعد الاعتماد...' : 'اشرح للطالب ما الذي يحتاج تعديله...'"
+                :placeholder="selectedStatus === 'accepted' ? t('accepted_feedback_placeholder') : t('rejected_feedback_placeholder')"
                 required
               ></textarea>
             </div>
 
             <button class="btn-submit-review" type="submit" :disabled="isSubmitting">
               <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
-              {{ isSubmitting ? 'جاري الحفظ...' : 'حفظ التقييم' }}
+              {{ isSubmitting ? t('saving_review') : t('save_review') }}
             </button>
           </form>
         </div>
@@ -180,11 +218,13 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { supervisorAPI } from '@/services/api/supervisor'
 import { useToastStore } from '@/stores/toast'
+import { useI18n } from '@/composables/useI18n'
 
 const toastStore = useToastStore()
+const { t, currentLang, isRTL } = useI18n()
 
 const isLoading = ref(false)
 const isSubmitting = ref(false)
@@ -204,6 +244,46 @@ const reviewForm = ref({
   feedback: ''
 })
 
+const studentCards = computed(() => {
+  const grouped = new Map()
+
+  for (const submission of submissions.value) {
+    const studentId = submission.student?.id || `unknown-${submission.id}`
+    if (!grouped.has(studentId)) {
+      grouped.set(studentId, {
+        student: submission.student || { id: studentId, name: t('unknown_student'), email: '' },
+        submissions: [],
+        attachmentsCount: 0,
+        acceptedCount: submission.student?.accepted_tasks || 0,
+        totalTasks: submission.student?.total_tasks || 0,
+        status: 'accepted'
+      })
+    }
+
+    const card = grouped.get(studentId)
+    card.submissions.push(submission)
+    card.attachmentsCount += submission.attachments?.length || 0
+  }
+
+  return Array.from(grouped.values()).map((card) => {
+    card.submissions.sort((a, b) => {
+      const aOrder = a.task?.order_number || 999
+      const bOrder = b.task?.order_number || 999
+      return aOrder - bOrder
+    })
+
+    if (card.submissions.some((item) => item.status === 'pending_review')) {
+      card.status = 'pending_review'
+    } else if (card.submissions.some((item) => item.status === 'rejected')) {
+      card.status = 'rejected'
+    } else {
+      card.status = 'accepted'
+    }
+
+    return card
+  }).sort((a, b) => statusWeight(a.status) - statusWeight(b.status))
+})
+
 const loadReviews = async () => {
   isLoading.value = true
   try {
@@ -212,11 +292,12 @@ const loadReviews = async () => {
     const list = response.data?.data?.submissions || []
     submissions.value = [
       ...list.filter((item) => item.status === 'pending_review'),
-      ...list.filter((item) => item.status !== 'pending_review')
+      ...list.filter((item) => item.status === 'rejected'),
+      ...list.filter((item) => !['pending_review', 'rejected'].includes(item.status))
     ]
   } catch (error) {
     console.error('Failed to load Jisr reviews:', error)
-    toastStore.addToast({ type: 'error', message: 'تعذر تحميل حلول برنامج الجسر.' })
+    toastStore.addToast({ type: 'error', message: t('load_jisr_reviews_failed') })
   } finally {
     isLoading.value = false
   }
@@ -230,7 +311,7 @@ const openReview = (submission, status) => {
       ? (submission.score ?? submission.task?.max_score ?? 100)
       : (submission.score ?? null),
     feedback: status === 'accepted'
-      ? (submission.feedback || 'أحسنت، تم اعتماد الحل.')
+      ? (submission.feedback || t('default_accept_feedback'))
       : (submission.feedback || '')
   }
   showReviewModal.value = true
@@ -256,7 +337,7 @@ const submitReview = async () => {
 
     toastStore.addToast({
       type: 'success',
-      message: selectedStatus.value === 'accepted' ? 'تم اعتماد الحل بنجاح.' : 'تم إرجاع الحل للطالب مع الملاحظات.'
+      message: selectedStatus.value === 'accepted' ? t('solution_accepted_success') : t('solution_returned_success')
     })
 
     closeModal()
@@ -265,7 +346,7 @@ const submitReview = async () => {
     console.error('Failed to review submission:', error)
     toastStore.addToast({
       type: 'error',
-      message: error.response?.data?.message || 'تعذر حفظ التقييم.'
+      message: error.response?.data?.message || t('save_review_failed')
     })
   } finally {
     isSubmitting.value = false
@@ -273,16 +354,18 @@ const submitReview = async () => {
 }
 
 const formatDate = (value) => {
-  if (!value) return 'غير محدد'
+  if (!value) return t('not_specified')
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? 'غير محدد' : date.toLocaleString('ar-EG')
+  return Number.isNaN(date.getTime())
+    ? t('not_specified')
+    : date.toLocaleString(currentLang.value === 'ar' ? 'ar-EG' : 'en-US')
 }
 
 const statusText = (status) => ({
-  pending_review: 'بانتظار التقييم',
-  accepted: 'تم الاعتماد',
-  rejected: 'مرفوض ويحتاج تعديل'
-}[status] || 'جديد')
+  pending_review: t('pending_review'),
+  accepted: t('accepted'),
+  rejected: t('rejected_needs_revision')
+}[status] || t('new'))
 
 const statusClass = (status) => ({
   pending_review: 'pending',
@@ -295,6 +378,12 @@ const badgeClass = (status) => ({
   accepted: 'success',
   rejected: 'danger'
 }[status] || 'warning')
+
+const statusWeight = (status) => ({
+  pending_review: 0,
+  rejected: 1,
+  accepted: 2
+}[status] ?? 3)
 
 onMounted(() => {
   loadReviews()
@@ -320,8 +409,8 @@ onMounted(() => {
 }
 
 .empty-state i {
-  font-size: 42px;
   color: var(--accent);
+  font-size: 42px;
 }
 
 .stats-grid {
@@ -331,14 +420,18 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-.stat-card {
+.stat-card,
+.student-card {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
+}
+
+.stat-card {
   border-radius: 18px;
-  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 18px;
 }
 
 .stat-card strong {
@@ -346,61 +439,18 @@ onMounted(() => {
 }
 
 .stat-card.warning strong {
-  color: #d97706;
+  color: #b7791f;
 }
 
 .stat-card.success strong {
-  color: #16a34a;
+  color: #238654;
 }
 
 .stat-card.danger strong {
-  color: #dc2626;
+  color: #b84a4a;
 }
 
-.stat-label {
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.submissions-grid {
-  display: grid;
-  gap: 18px;
-}
-
-.submission-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 22px;
-  padding: 22px;
-}
-
-.submission-card.pending {
-  border-right: 4px solid #f59e0b;
-}
-
-.submission-card.accepted {
-  border-right: 4px solid #22c55e;
-}
-
-.submission-card.rejected {
-  border-right: 4px solid #ef4444;
-}
-
-.submission-top,
-.actions-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.student-name,
-.task-title {
-  font-weight: 700;
-  color: var(--text-dark);
-}
-
+.stat-label,
 .student-meta,
 .review-meta,
 .task-description,
@@ -408,145 +458,228 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-.task-box,
-.answer-box,
-.attachments-box {
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: 16px;
+.student-cards {
+  display: grid;
+  gap: 20px;
+}
+
+.student-card {
+  border-radius: 24px;
+  padding: 22px;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, .07);
+}
+
+.student-card.pending {
+  border-inline-start: 5px solid #d9a52f;
+}
+
+.student-card.accepted {
+  border-inline-start: 5px solid #4baf72;
+}
+
+.student-card.rejected {
+  border-inline-start: 5px solid #d66a6a;
+}
+
+.student-card__top,
+.task-row__top,
+.actions-row,
+.attachments-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.student-name,
+.task-title,
+.section-title {
+  color: var(--text-dark);
+  font-weight: 700;
+}
+
+.student-summary {
   background: var(--main-bg);
   border: 1px solid var(--border-color);
-}
-
-.section-title {
-  font-weight: 700;
-  margin-bottom: 10px;
-}
-
-.attachments-header {
+  border-radius: 16px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px;
 }
 
-.attachments-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
-  border: 1px solid var(--border-color);
-  font-size: 12px;
-  font-weight: 700;
-}
-
+.student-summary span,
+.attachments-count,
 .status-pill {
-  padding: 8px 14px;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 700;
 }
 
+.student-summary span {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  padding: 7px 12px;
+}
+
+.task-list {
+  display: grid;
+  gap: 0;
+  margin-top: 18px;
+}
+
+.task-row {
+  border-top: 1px solid var(--border-color);
+  padding: 18px 0;
+}
+
+.task-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.task-row:last-child {
+  padding-bottom: 0;
+}
+
+.task-row.pending .task-title {
+  color: #9a6a0a;
+}
+
+.task-row.accepted .task-title {
+  color: #217345;
+}
+
+.task-row.rejected .task-title {
+  color: #9f2f2f;
+}
+
+.answer-box,
+.attachments-box {
+  background: var(--main-bg);
+  border-radius: 14px;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.attachments-box.muted {
+  color: var(--text-muted);
+}
+
+.status-pill {
+  padding: 8px 14px;
+}
+
 .status-pill.warning {
-  background: #fff7ed;
-  color: #c2410c;
+  background: #fff7d6;
+  color: #8a5a04;
 }
 
 .status-pill.success {
-  background: #f0fdf4;
-  color: #15803d;
+  background: #e8f8ef;
+  color: #1f6f42;
 }
 
 .status-pill.danger {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: #fdecec;
+  color: #9f2f2f;
+}
+
+.attachments-count {
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  color: #475569;
+  padding: 6px 12px;
 }
 
 .attachments-list {
   display: grid;
   gap: 12px;
+  margin-top: 12px;
 }
 
 .attachment-item {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  border-radius: 16px;
+  background: var(--card-bg);
   border: 1px solid var(--border-color);
-  background: #fff;
+  border-radius: 14px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
   padding: 14px 16px;
 }
 
 .attachment-item__info {
-  display: flex;
   align-items: center;
+  display: flex;
+  flex: 1;
   gap: 12px;
   min-width: 0;
-  flex: 1;
 }
 
 .attachment-item__icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
   background: rgba(124, 58, 237, 0.08);
+  border-radius: 12px;
   color: var(--accent);
-  font-size: 18px;
+  display: inline-flex;
   flex-shrink: 0;
+  font-size: 18px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
 }
 
 .attachment-item__name {
+  color: var(--text-color);
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-color);
   word-break: break-word;
 }
 
 .attachment-item__meta {
-  font-size: 12px;
   color: #64748b;
+  font-size: 12px;
   margin-top: 2px;
 }
 
 .attachment-item__actions {
-  display: flex;
   align-items: center;
-  gap: 8px;
+  display: flex;
   flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
 }
 
 .attachment-btn {
-  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  text-decoration: none;
   border-radius: 999px;
-  padding: 8px 14px;
+  display: inline-flex;
   font-size: 13px;
   font-weight: 700;
+  gap: 8px;
+  padding: 8px 14px;
+  text-decoration: none;
 }
 
 .attachment-btn--view {
-  color: var(--accent);
   background: rgba(124, 58, 237, 0.08);
+  color: var(--accent);
 }
 
 .attachment-btn--download {
-  color: #166534;
-  background: #dcfce7;
+  background: #eaf8f0;
+  color: #1f6f42;
 }
 
 .submission-footer {
-  margin-top: 18px;
+  margin-top: 16px;
+}
+
+.actions-row {
+  margin-top: 12px;
 }
 
 .btn-review,
@@ -557,38 +690,38 @@ onMounted(() => {
 }
 
 .btn-review {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
-  color: #fff;
-  border-radius: 12px;
-  padding: 10px 16px;
-  display: inline-flex;
   align-items: center;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  border-radius: 12px;
+  color: #fff;
+  display: inline-flex;
   gap: 8px;
+  padding: 10px 16px;
 }
 
 .btn-review.danger {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #fdecec;
+  color: #9f2f2f;
 }
 
 .modal-overlay {
-  position: fixed;
-  inset: 0;
+  align-items: center;
   background: rgba(0, 0, 0, 0.45);
   display: flex;
-  align-items: center;
+  inset: 0;
   justify-content: center;
-  z-index: 1200;
   padding: 20px;
+  position: fixed;
+  z-index: 1200;
 }
 
 .review-modal {
-  width: 100%;
-  max-width: 640px;
   background: var(--card-bg);
   border-radius: 24px;
-  overflow: hidden;
   box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
+  max-width: 640px;
+  overflow: hidden;
+  width: 100%;
 }
 
 .modal-header,
@@ -599,25 +732,25 @@ onMounted(() => {
 .modal-header {
   border-bottom: 1px solid var(--border-color);
   display: flex;
-  justify-content: space-between;
   gap: 12px;
+  justify-content: space-between;
 }
 
 .btn-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
   background: var(--main-bg);
   border: 1px solid var(--border-color);
+  border-radius: 10px;
+  height: 36px;
+  width: 36px;
 }
 
 .btn-submit-review {
-  width: 100%;
   background: linear-gradient(135deg, #7c3aed, #6d28d9);
-  color: #fff;
   border-radius: 12px;
-  padding: 12px 16px;
+  color: #fff;
   font-weight: 700;
+  padding: 12px 16px;
+  width: 100%;
 }
 
 @media (max-width: 992px) {
@@ -632,8 +765,8 @@ onMounted(() => {
   }
 
   .attachment-item {
-    flex-direction: column;
     align-items: stretch;
+    flex-direction: column;
   }
 
   .attachment-item__actions {

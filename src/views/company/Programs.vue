@@ -6,10 +6,16 @@
         <h2 class="fw-bold mb-2">{{ t('training_programs') }}</h2>
         <p class="text-muted mb-0">{{ t('manage_programs') }}</p>
       </div>
-      <button class="btn-accent-gradient" @click="createProgram">
-        <i class="bi bi-plus-circle me-2"></i>
-        {{ t('new_program') }}
-      </button>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn-trello" @click="openTrelloSettings">
+          <i class="bi bi-trello me-2"></i>
+          تكامل Trello
+        </button>
+        <button class="btn-accent-gradient" @click="createProgram">
+          <i class="bi bi-plus-circle me-2"></i>
+          {{ t('new_program') }}
+        </button>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -19,6 +25,20 @@
     </div>
 
     <div v-else>
+      <div class="trello-program-banner mb-4">
+        <div>
+          <div class="small-title">مصدر مهام Trello</div>
+          <h5 class="fw-bold mb-1">مهام الشركة يتم إنشاؤها من Trello</h5>
+          <p class="text-muted mb-0">
+            اربط لوحة وقائمة Trello بكل برنامج تدريب، ثم زامن البطاقات حتى تظهر للطلاب كمهام داخل النظام.
+          </p>
+        </div>
+        <button class="btn-trello" @click="openTrelloSettings">
+          <i class="bi bi-arrow-repeat me-2"></i>
+          ربط / مزامنة
+        </button>
+      </div>
+
       <!-- Stats Cards -->
       <div class="row g-4 mb-5">
         <div class="col-md-3" v-for="stat in programStats" :key="stat.key">
@@ -240,6 +260,10 @@ const createProgram = () => {
   router.push('/company/programs/create')
 }
 
+const openTrelloSettings = () => {
+  router.push('/company/trello-settings')
+}
+
 const viewProgram = (program) => {
   router.push(`/company/programs/${program.id}`)
 }
@@ -299,6 +323,24 @@ onMounted(() => {
 
 <style scoped>
 .company-programs { padding: 30px; }
+.trello-program-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  border: 1px solid rgba(0, 121, 191, 0.18);
+  border-radius: 18px;
+  padding: 20px;
+}
+.small-title {
+  color: #0079bf;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 4px;
+}
 .stat-card { background: white; border-radius: 20px; padding: 24px; display: flex; align-items: center; gap: 15px; border: 1px solid #f0f0f0; }
 .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: white; }
 .stat-content { flex: 1; }
@@ -317,11 +359,21 @@ onMounted(() => {
 .btn-accent-outline { background: transparent; color: #7c3aed; border: 2px solid #7c3aed; border-radius: 8px; padding: 6px 16px; font-weight: 600; font-size: 13px; transition: all 0.3s ease; cursor: pointer; }
 .btn-accent-outline:hover { background: #7c3aed; color: white; transform: translateY(-2px); }
 .btn-accent-gradient { background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; border: none; border-radius: 10px; padding: 10px 24px; font-weight: 600; transition: all 0.3s ease; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.btn-trello { background: linear-gradient(135deg, #0079bf, #026aa7); color: white; border: none; border-radius: 10px; padding: 10px 18px; font-weight: 700; transition: all 0.3s ease; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.btn-trello:hover { color: white; transform: translateY(-2px); box-shadow: 0 10px 22px rgba(0, 121, 191, .22); }
 .pagination .page-link { background: white; border-color: #e2e8f0; color: #1e293b; cursor: pointer; }
 .pagination .active .page-link { background: #7c3aed; border-color: #7c3aed; color: white; }
 [data-theme="dark"] .stat-card,
 [data-theme="dark"] .filter-section,
 [data-theme="dark"] .program-card { background: #1f2937; border-color: #374151; }
+[data-theme="dark"] .trello-program-banner { background: linear-gradient(135deg, #0f172a, #1f2937); border-color: #334155; }
 [data-theme="dark"] .btn-refresh { background: #1f2937; border-color: #374151; color: #f3f4f6; }
 [data-theme="dark"] .pagination .page-link { background: #1f2937; border-color: #374151; color: #f3f4f6; }
+
+@media (max-width: 768px) {
+  .trello-program-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
 </style>
