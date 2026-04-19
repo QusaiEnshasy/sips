@@ -161,28 +161,18 @@
       </div>
     </div>
 
-    <div class="automation-card mt-4" data-aos="fade-up" data-aos-delay="150">
+    <div class="trello-rules-card mt-4" data-aos="fade-up" data-aos-delay="150">
       <div class="automation-content">
         <div class="automation-icon">
-          <i class="bi bi-lightning-charge"></i>
+          <i class="bi bi-list-check"></i>
         </div>
         <div>
-          <h5 class="fw-bold mb-1">المزامنة التلقائية</h5>
-          <p class="text-muted mb-1">عند تفعيل Webhook، أي تغيير على Trello يشغل مزامنة تلقائية داخل النظام.</p>
-          <small class="text-muted">
-            الحالة: <strong>{{ webhookEnabled ? 'مفعلة' : 'غير مفعلة' }}</strong>
-            <span v-if="webhookCallbackUrl"> | الرابط: {{ webhookCallbackUrl }}</span>
-          </small>
+          <h5 class="fw-bold mb-1">شروط إنشاء المهمة داخل Trello</h5>
+          <p class="text-muted mb-1">أنشئ الكرت داخل Trello الحقيقي في القائمة المرتبطة بالبرنامج، ثم اضغط مزامنة من هنا.</p>
+          <small class="text-muted d-block">لازم يحتوي الكرت على طالب محدد داخل العنوان أو الوصف مثل: <strong>student: student@email.com</strong> أو <strong>student_id: 123456</strong>.</small>
+          <small class="text-muted d-block">الكرت بدون طالب محدد لن يظهر لأي طالب، حتى لا تنتشر المهمة لكل الطلاب بالغلط.</small>
         </div>
       </div>
-      <button v-if="!webhookEnabled" class="btn-accent-gradient" @click="enableWebhook" :disabled="isWebhookSaving">
-        <i class="bi bi-broadcast-pin me-2"></i>
-        تفعيل Webhook
-      </button>
-      <button v-else class="btn-outline text-danger" @click="disableWebhook" :disabled="isWebhookSaving">
-        <i class="bi bi-broadcast-pin me-2"></i>
-        إيقاف Webhook
-      </button>
     </div>
 
     <!-- Connected Internships -->
@@ -238,6 +228,9 @@
             </div>
           </div>
           <div class="integration-actions">
+            <button class="btn-icon-accent" @click="openTrelloBoard(int)" title="فتح Trello">
+              <i class="bi bi-box-arrow-up-right"></i>
+            </button>
             <button class="btn-icon-accent" @click="syncInternship(int)" :title="t('sync_now')">
               <i class="bi bi-arrow-repeat"></i>
             </button>
@@ -265,7 +258,7 @@
           <div>
             <div class="fw-bold">{{ log.program || 'برنامج غير محدد' }}</div>
             <small class="text-muted">
-              {{ log.trigger === 'webhook' ? 'Webhook' : 'يدوي' }} |
+              {{ log.trigger === 'manual' ? 'يدوي' : 'تلقائي سابق' }} |
               {{ formatDate(log.finished_at || log.started_at) }}
             </small>
           </div>
@@ -359,7 +352,6 @@ const isLoadingBoards = ref(false)
 const isLoadingIntegrations = ref(false)
 const isLoadingLists = ref(false)
 const isConnecting = ref(false)
-const isWebhookSaving = ref(false)
 const connectionStatus = ref('')
 const connectionStatusClass = ref('')
 const boards = ref([])
@@ -367,8 +359,6 @@ const integrations = ref([])
 const syncLogs = ref([])
 const internships = ref([])
 const lists = ref([])
-const webhookEnabled = ref(false)
-const webhookCallbackUrl = ref('')
 const showConnectModal = ref(false)
 const selectedBoard = ref(null)
 const selectedBoardId = ref('')
@@ -417,9 +407,6 @@ const loadSettings = async () => {
     hasTrello.value = !!settings.has_trello
     apiKey.value = settings.has_trello ? '' : apiKey.value
     apiToken.value = ''
-    webhookEnabled.value = !!settings.webhook_enabled
-    webhookCallbackUrl.value = settings.webhook_callback_url || ''
-
     if (settings.has_trello) {
       await loadBoards()
     } else {
@@ -602,29 +589,10 @@ const syncInternship = async (integration) => {
   }
 }
 
-const enableWebhook = async () => {
-  isWebhookSaving.value = true
-  try {
-    await companyAPI.enableTrelloWebhook()
-    alert('تم تفعيل Webhook بنجاح.')
-    await loadSettings()
-  } catch (error) {
-    alert(error?.response?.data?.message || 'تعذر تفعيل Webhook. إذا كنت تعمل محليًا استخدم زر المزامنة اليدوية.')
-  } finally {
-    isWebhookSaving.value = false
-  }
-}
-
-const disableWebhook = async () => {
-  isWebhookSaving.value = true
-  try {
-    await companyAPI.disableTrelloWebhook()
-    alert('تم إيقاف Webhook.')
-    await loadSettings()
-  } catch (error) {
-    alert(error?.response?.data?.message || 'تعذر إيقاف Webhook.')
-  } finally {
-    isWebhookSaving.value = false
+const openTrelloBoard = (integration) => {
+  const url = integration?.board_url || (integration?.board_id ? `https://trello.com/b/${integration.board_id}` : '')
+  if (url) {
+    window.open(url, '_blank', 'noopener')
   }
 }
 
@@ -637,8 +605,6 @@ const disconnectTrello = async () => {
     boards.value = []
     integrations.value = []
     syncLogs.value = []
-    webhookEnabled.value = false
-    webhookCallbackUrl.value = ''
     connectionStatus.value = 'تم فصل Trello بنجاح.'
     connectionStatusClass.value = 'text-success'
   } catch (error) {
@@ -713,14 +679,14 @@ onMounted(() => {
   border-color: var(--accent);
 }
 
-.settings-card, .boards-card, .integrations-card, .automation-card {
+.settings-card, .boards-card, .integrations-card, .automation-card, .trello-rules-card {
   background: var(--card-bg);
   border-radius: 24px;
   padding: 24px;
   border: 1px solid var(--border-color);
 }
 
-.automation-card {
+.automation-card, .trello-rules-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1069,7 +1035,7 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .board-item, .integration-item, .automation-card, .automation-content, .sync-log-item {
+  .board-item, .integration-item, .automation-card, .trello-rules-card, .automation-content, .sync-log-item {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;

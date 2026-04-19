@@ -194,6 +194,17 @@ class TrelloService
         return $this->put("/cards/{$cardId}", $data, $integration);
     }
 
+    public function addCardComment(string $cardId, string $text, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $cardId === '' || trim($text) === '') {
+            return [];
+        }
+
+        return $this->post("/cards/{$cardId}/actions/comments", [
+            'text' => $text,
+        ], $integration);
+    }
+
     public function moveCard(string $cardId, string $listId, ?TrelloIntegration $integration = null): array
     {
         return $this->updateCard($cardId, ['idList' => $listId], $integration);

@@ -27,63 +27,23 @@
     <section v-if="role === 'company'" class="create-panel">
       <div class="section-heading">
         <div>
-          <h2>إنشاء مهمة تدريبية</h2>
-          <p>اختر الطلاب المطلوبين، وسيتم إنشاء نسخة مستقلة من المهمة لكل طالب.</p>
+          <h2>إنشاء المهام يتم من Trello الحقيقي</h2>
+          <p>الشركة لا تنشئ مهام الطلاب من الموقع. افتح Trello، أنشئ الكروت هناك، ثم ارجع واضغط مزامنة من صفحة تكامل Trello.</p>
         </div>
-        <span>{{ selectedApplicationIds.length }} طالب محدد</span>
+        <router-link class="primary-action link-action" to="/company/trello-settings">
+          فتح تكامل Trello
+        </router-link>
       </div>
 
-      <form class="task-form" @submit.prevent="createTask">
-        <div class="form-grid">
-          <label>
-            عنوان المهمة
-            <input v-model.trim="taskForm.title" required maxlength="255" placeholder="مثال: تقرير الأسبوع الأول" />
-          </label>
-          <label>
-            تاريخ التسليم
-            <input v-model="taskForm.due_date" type="date" />
-          </label>
-          <label>
-            أولوية المهمة
-            <select v-model="taskForm.label">
-              <option value="">عادية</option>
-              <option value="red">عاجلة</option>
-              <option value="blue">متوسطة</option>
-              <option value="green">خفيفة</option>
-            </select>
-          </label>
+      <div class="students-box">
+        <div class="students-toolbar">
+          <strong>شروط ظهور كرت Trello للطالب</strong>
         </div>
-
-        <label>
-          وصف المهمة
-          <textarea v-model.trim="taskForm.details" rows="4" maxlength="5000" placeholder="اكتب المطلوب من الطالب بوضوح"></textarea>
-        </label>
-
-        <div class="students-box">
-          <div class="students-toolbar">
-            <strong>طلاب التدريب المعتمدين</strong>
-            <button type="button" @click="toggleAllStudents">
-              {{ allStudentsSelected ? 'إلغاء تحديد الكل' : 'تحديد الكل' }}
-            </button>
-          </div>
-
-          <div v-if="applications.length === 0" class="empty-state small">
-            لا يوجد طلاب تدريب معتمدون لهذه الشركة حالياً.
-          </div>
-          <label v-for="application in applications" :key="application.id" class="student-row">
-            <input v-model="selectedApplicationIds" type="checkbox" :value="application.id" />
-            <span>
-              <strong>{{ application.student_name || 'طالب' }}</strong>
-              <small>{{ application.program_title || 'برنامج تدريب' }} · {{ application.student_email || '-' }}</small>
-            </span>
-          </label>
-        </div>
-
-        <button class="primary-action" :disabled="savingTask || selectedApplicationIds.length === 0">
-          <span v-if="savingTask" class="spinner-border spinner-border-sm"></span>
-          إنشاء المهمة للطلاب المحددين
-        </button>
-      </form>
+        <div class="rule-row">الكرت لازم يكون داخل القائمة المرتبطة بالبرنامج في صفحة تكامل Trello.</div>
+        <div class="rule-row">اكتب داخل عنوان أو وصف الكرت: <b>student: email</b> أو <b>student_id: الرقم الجامعي</b>.</div>
+        <div class="rule-row">الكرت بدون طالب محدد لن تتم مزامنته، حتى لا يظهر لكل الطلاب بالغلط.</div>
+        <div class="rule-row">بعد تسليم الطالب من الموقع، سيضاف تعليق تلقائي على كرت Trello الحقيقي مع الحل وروابط الملفات.</div>
+      </div>
     </section>
 
     <section class="tasks-panel">
@@ -112,6 +72,8 @@
             <span><b>البرنامج</b>{{ task.program || '-' }}</span>
             <span><b>الشركة</b>{{ task.company || '-' }}</span>
             <span><b>الحالة</b>{{ task.submitted ? 'تم التسليم' : 'بانتظار التسليم' }}</span>
+            <span><b>مصدر المهمة</b>{{ task.source === 'trello' ? 'Trello' : 'النظام' }}</span>
+            <span><b>أنشأها</b>{{ task.source === 'trello' ? 'الشركة من Trello' : creatorLabel(task.creator) }}</span>
           </div>
 
           <div v-if="task.student_solution" class="solution-box">
@@ -279,6 +241,14 @@ const statusText = (status) => {
   if (status === 'done') return 'منجزة'
   if (status === 'progress') return 'قيد التنفيذ'
   return 'جديدة'
+}
+
+const creatorLabel = (creator) => {
+  if (!creator) return '-'
+  if (creator.role === 'supervisor') return `المشرف: ${creator.name}`
+  if (creator.role === 'company') return `الشركة: ${creator.name}`
+  if (creator.role === 'admin') return `الإدارة: ${creator.name}`
+  return creator.name || '-'
 }
 
 onMounted(loadWorkspace)
@@ -474,10 +444,26 @@ textarea {
   font-weight: 500;
 }
 
+.rule-row {
+  background: #ffffff;
+  border: 1px solid #ede9fe;
+  border-radius: 16px;
+  color: #334155;
+  margin-top: 10px;
+  padding: 12px 14px;
+}
+
 .primary-action {
   padding: 13px 18px;
   background: #6d28d9;
   color: #ffffff;
+}
+
+.link-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .primary-action.compact {

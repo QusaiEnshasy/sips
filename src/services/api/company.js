@@ -44,7 +44,5 @@ export const companyAPI = {
   connectTrelloBoard: (internshipId, data) => webApi.post(`/company/trello/internships/${internshipId}/connect`, data),
   syncTrello: (internshipId) => webApi.post(`/company/trello/internships/${internshipId}/sync`),
   unlinkTrelloInternship: (internshipId) => webApi.delete(`/company/trello/internships/${internshipId}/unlink`),
-  enableTrelloWebhook: () => webApi.post('/company/trello/webhook/enable'),
-  disableTrelloWebhook: () => webApi.delete('/company/trello/webhook/disable'),
   disconnectTrello: () => webApi.delete('/company/trello/disconnect')
 }

@@ -99,7 +99,7 @@ class TrelloTaskSyncService
                     $counts['skipped']++;
                     $assignmentDetails[] = [
                         'card' => $card['name'] ?? $card['id'] ?? null,
-                        'reason' => 'student marker did not match an approved student',
+                        'reason' => 'missing or invalid student marker',
                     ];
                     continue;
                 }
@@ -172,7 +172,7 @@ class TrelloTaskSyncService
         $markers = $this->extractStudentMarkers($card);
 
         if ($markers->isEmpty()) {
-            return $applications;
+            return collect();
         }
 
         return $applications->filter(function (Application $application) use ($markers) {

@@ -33,27 +33,6 @@ class TrainingTaskController extends Controller
 
         return view('spa');
 
-        $user = $request->user();
-
-        if ($user->role === 'supervisor') {
-            return redirect()->route('supervisor.weekly-tasks');
-        }
-
-        $query = Application::query()
-            ->where('company_status', 'approved')
-            ->where('supervisor_status', 'approved')
-            ->where('final_status', 'approved');
-
-        if ($user->role === 'student') {
-            $query->where('student_id', $user->id);
-        } elseif ($user->role === 'company') {
-            $query->whereHas('opportunity', fn (Builder $q) => $q->where('company_user_id', $user->id));
-        } else {
-            abort(403);
-        }
-
-        $application = $query->latest()->first();
-
         if (! $application) {
             return back()->with('error', 'لا يوجد تدريب مكتمل الموافقات بعد لعرض لوحة المهام.');
         }
@@ -68,70 +47,10 @@ class TrainingTaskController extends Controller
         $user = $request->user();
         abort_unless($user->role === 'company', 403);
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'details' => ['nullable', 'string', 'max:5000'],
-            'due_date' => ['nullable', 'date'],
-            'label' => ['nullable', 'in:red,green,blue'],
-            'application_ids' => ['required', 'array', 'min:1'],
-            'application_ids.*' => ['integer'],
-        ]);
-
-        $applications = Application::with(['student', 'opportunity'])
-            ->where('company_status', 'approved')
-            ->where('supervisor_status', 'approved')
-            ->where('final_status', 'approved')
-            ->whereNull('training_completed_at')
-            ->whereIn('id', $validated['application_ids'])
-            ->whereHas('opportunity', fn (Builder $q) => $q->where('company_user_id', $user->id))
-            ->get();
-
-        if ($applications->isEmpty()) {
-            return response()->json([
-                'message' => 'لا يوجد طلاب تدريب معتمدون لإنشاء المهمة لهم.',
-            ], 422);
-        }
-
-        $createdCount = 0;
-
-        foreach ($applications as $application) {
-            if ($this->isTrainingEnded($application)) {
-                continue;
-            }
-
-            $task = Task::create([
-                'application_id' => $application->id,
-                'company_user_id' => $user->id,
-                'created_by' => $user->id,
-                'title' => trim($validated['title']),
-                'details' => $validated['details'] ?: null,
-                'due_date' => $validated['due_date'] ?: null,
-                'label' => $validated['label'] ?: null,
-                'assigned_user' => $application->student?->name,
-                'status' => 'todo',
-                'source' => 'manual',
-                'order' => (Task::where('application_id', $application->id)->where('status', 'todo')->max('order') ?? 0) + 1,
-            ]);
-
-            $this->attachTaskToStudent($task, $application->student_id ? (int) $application->student_id : null);
-            $createdCount++;
-
-            if ($application->student_id) {
-                $this->notifications->notifyUser(
-                    userId: (int) $application->student_id,
-                    title: 'New Training Task',
-                    description: 'تمت إضافة مهمة تدريب جديدة من الشركة.',
-                    type: 'info',
-                    meta: ['category' => 'task']
-                );
-            }
-        }
-
         return response()->json([
-            'status' => 'success',
-            'message' => 'تم إنشاء المهمة لكل طالب بشكل منفصل.',
-            'created_count' => $createdCount,
-        ], 201);
+            'status' => 'error',
+            'message' => 'إنشاء مهام الشركة يتم من Trello الحقيقي فقط. أنشئ الكرت في Trello ثم اضغط مزامنة.',
+        ], 422);
     }
 
     public function submitWorkspaceTask(Request $request, Task $task): JsonResponse
@@ -164,6 +83,7 @@ class TrainingTaskController extends Controller
             ]);
         }
 
+        $this->syncStudentSubmissionToTrello($task->fresh(['attachments']), $application);
         $this->notifyTaskSubmissionReviewers($application);
 
         return response()->json([
@@ -463,6 +383,7 @@ class TrainingTaskController extends Controller
         $tasksQuery = Task::with([
             'application.student:id,name,email,supervisor_code',
             'application.opportunity.companyUser:id,name,company_name,email',
+            'creator:id,name,role',
             'assignedStudents:id,name,email',
             'attachments.user:id,name,role',
         ]);
@@ -578,6 +499,11 @@ class TrainingTaskController extends Controller
             ] : null,
             'program' => $application?->opportunity?->title,
             'company' => $company ? ($company->company_name ?: $company->name) : null,
+            'creator' => $task->creator ? [
+                'id' => $task->creator->id,
+                'name' => $task->creator->name,
+                'role' => $task->creator->role,
+            ] : null,
             'assigned_students' => $task->assignedStudents->map(fn ($student) => [
                 'id' => $student->id,
                 'name' => $student->name,
@@ -611,6 +537,38 @@ class TrainingTaskController extends Controller
             type: 'success',
             meta: ['category' => 'task']
         );
+    }
+
+    private function syncStudentSubmissionToTrello(Task $task, Application $application): void
+    {
+        $integration = $this->resolveCompanyIntegration($application);
+        if (! $integration || ! $task->trello_card_id) {
+            return;
+        }
+
+        $task->loadMissing(['attachments']);
+        $student = $application->student;
+        $attachmentLines = $task->attachments
+            ->map(fn ($attachment) => '- ' . $attachment->filename . ': ' . asset('storage/' . ltrim((string) $attachment->filepath, '/')))
+            ->implode("\n");
+
+        $comment = trim(
+            "تم تسليم المهمة من الطالب داخل نظام SIP.\n"
+            . 'الطالب: ' . ($student?->name ?? '-') . "\n"
+            . 'البريد: ' . ($student?->email ?? '-') . "\n"
+            . 'الحل: ' . ($task->student_solution ?: '-') . "\n"
+            . ($attachmentLines !== '' ? "الملفات:\n{$attachmentLines}\n" : '')
+            . 'رابط المتابعة داخل النظام: ' . route('tasks.board', ['application' => $application->id])
+        );
+
+        try {
+            $this->trello->addCardComment((string) $task->trello_card_id, $comment, $integration);
+            $this->trello->updateCard((string) $task->trello_card_id, [
+                'dueComplete' => 'true',
+            ], $integration);
+        } catch (\Throwable) {
+            // Keep the local submission saved even if Trello is temporarily unavailable.
+        }
     }
 
     private function ensureTrainingOpen(Application $application): void
@@ -773,12 +731,7 @@ class TrainingTaskController extends Controller
             ]);
         }
 
-        $integration = $this->resolveCompanyIntegration($application);
-        if ($task->trello_card_id && $integration) {
-            $this->trello->updateCard($task->trello_card_id, [
-                'desc' => "Solution:\n" . $task->student_solution,
-            ], $integration);
-        }
+        $this->syncStudentSubmissionToTrello($task->fresh(['attachments']), $application);
 
         $recipients = [];
         $companyId = (int) optional($application->opportunity)->company_user_id;

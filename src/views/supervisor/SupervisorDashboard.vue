@@ -10,21 +10,6 @@
       </button>
     </div>
 
-    <div v-if="supervisorCode" class="supervisor-code-card mb-4">
-      <div class="code-copy-icon">
-        <i class="bi bi-key"></i>
-      </div>
-      <div class="flex-grow-1">
-        <div class="text-muted small mb-1">كود المشرف للطلاب</div>
-        <div class="code-value">{{ supervisorCode }}</div>
-        <small class="text-muted">أعطِ هذا الكود للطلاب حتى يرتبطوا بحسابك عند التسجيل.</small>
-      </div>
-      <button class="btn btn-outline-primary" @click="copySupervisorCode">
-        <i class="bi bi-copy me-1"></i>
-        نسخ الكود
-      </button>
-    </div>
-
     <div class="row g-4 mb-4">
       <div class="col-sm-6 col-lg-3" v-for="stat in statCards" :key="stat.label">
         <div class="card p-3 h-100 border-0 shadow-sm">
@@ -191,34 +176,6 @@ onMounted(loadDashboard)
 
 <style scoped>
 .supervisor-dashboard { padding: 20px 0; }
-.supervisor-code-card {
-  align-items: center;
-  background: linear-gradient(135deg, #eef6ff, #ffffff);
-  border: 1px solid #cfe4ff;
-  border-radius: 20px;
-  box-shadow: 0 14px 35px rgba(15, 23, 42, .06);
-  display: flex;
-  gap: 16px;
-  padding: 18px 20px;
-}
-.code-copy-icon {
-  align-items: center;
-  background: #2563eb;
-  border-radius: 16px;
-  color: #fff;
-  display: inline-flex;
-  flex-shrink: 0;
-  font-size: 24px;
-  height: 54px;
-  justify-content: center;
-  width: 54px;
-}
-.code-value {
-  color: #111827;
-  font-size: 26px;
-  font-weight: 900;
-  letter-spacing: .08em;
-}
 .jisr-entry-card {
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(124, 58, 237, 0.02));
   border: 1px solid #d8ccff;
@@ -239,13 +196,4 @@ onMounted(loadDashboard)
 }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1200; }
 .modal-content { background: #fff; width: min(520px, 92vw); border-radius: 16px; padding: 20px; }
-@media (max-width: 768px) {
-  .supervisor-code-card {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .supervisor-code-card .btn {
-    width: 100%;
-  }
-}
 </style>
