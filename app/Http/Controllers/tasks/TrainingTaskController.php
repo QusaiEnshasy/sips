@@ -563,8 +563,13 @@ class TrainingTaskController extends Controller
 
         try {
             $this->trello->addCardComment((string) $task->trello_card_id, $comment, $integration);
+            $completedDueDate = $task->due_date
+                ? $task->due_date->copy()->endOfDay()->toIso8601String()
+                : now()->toIso8601String();
+
             $this->trello->updateCard((string) $task->trello_card_id, [
-                'dueComplete' => 'true',
+                'due' => $completedDueDate,
+                'dueComplete' => true,
             ], $integration);
         } catch (\Throwable) {
             // Keep the local submission saved even if Trello is temporarily unavailable.

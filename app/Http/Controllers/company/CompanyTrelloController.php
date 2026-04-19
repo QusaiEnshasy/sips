@@ -376,14 +376,28 @@ class CompanyTrelloController extends Controller
             return response()->json(['status' => 'success', 'data' => []]);
         }
 
-        $payload = $integration->internshipLinks->map(function (TrelloInternshipLink $link) use ($integration) {
+        $boardUrl = null;
+        if ($integration->trello_board_id) {
+            try {
+                $board = $this->trello->getBoard((string) $integration->trello_board_id, $integration);
+                $boardUrl = (string) ($board['url'] ?? '');
+            } catch (\Throwable) {
+                $boardUrl = '';
+            }
+
+            if ($boardUrl === '') {
+                $boardUrl = 'https://trello.com/b/' . $integration->trello_board_id;
+            }
+        }
+
+        $payload = $integration->internshipLinks->map(function (TrelloInternshipLink $link) use ($integration, $boardUrl) {
             return [
                 'id' => $link->id,
                 'internship_id' => $link->opportunity_id,
                 'internship_title' => $link->opportunity?->title,
                 'board_id' => $integration->trello_board_id,
                 'board_name' => $integration->trello_board_name,
-                'board_url' => $integration->trello_board_id ? 'https://trello.com/b/' . $integration->trello_board_id : null,
+                'board_url' => $boardUrl,
                 'list_id' => $link->trello_list_id,
                 'list_name' => $link->trello_list_name,
                 'last_sync' => optional($link->last_synced_at)->toISOString(),

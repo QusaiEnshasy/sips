@@ -16,6 +16,10 @@
           <i class="bi bi-arrow-left me-2"></i>
           العودة للوحة التحكم
         </router-link>
+        <button type="button" class="btn-trello-direct" @click="openTrelloHome">
+          <i class="bi bi-box-arrow-up-right me-2"></i>
+          فتح Trello الرسمي
+        </button>
       </div>
     </div>
 
@@ -596,6 +600,10 @@ const openTrelloBoard = (integration) => {
   }
 }
 
+const openTrelloHome = () => {
+  window.open('https://trello.com/', '_blank', 'noopener')
+}
+
 const disconnectTrello = async () => {
   if (!confirm('سيتم فصل حساب Trello من النظام. هل أنت متأكد؟')) return
 
@@ -677,6 +685,22 @@ onMounted(() => {
   background: var(--accent-soft);
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.btn-trello-direct {
+  background: linear-gradient(135deg, #0079bf, #026aa7);
+  border: none;
+  border-radius: 30px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 9px 20px;
+  transition: all .25s ease;
+}
+
+.btn-trello-direct:hover {
+  box-shadow: 0 10px 22px rgba(0, 121, 191, .25);
+  transform: translateY(-1px);
 }
 
 .settings-card, .boards-card, .integrations-card, .automation-card, .trello-rules-card {
