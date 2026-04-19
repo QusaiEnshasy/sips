@@ -127,7 +127,7 @@ const routes = [
   {
     path: '/supervisor/weekly-tasks',
     name: 'WeeklyTasksMonitoring',
-    component: () => import('@/views/supervisor/WeeklyTasksMonitoring.vue'),
+    component: () => import('@/views/shared/TrainingTasksWorkspace.vue'),
     meta: { requiresAuth: true, role: 'supervisor' }
   },
   {
@@ -158,7 +158,7 @@ const routes = [
   {
     path: '/student/workspace',
     name: 'TrainingWorkspace',
-    component: () => import('@/views/student/TrainingWorkspace.vue'),
+    component: () => import('@/views/shared/TrainingTasksWorkspace.vue'),
     meta: { requiresAuth: true, role: 'student' }
   },
   {
@@ -253,6 +253,12 @@ const routes = [
     meta: { requiresAuth: true, role: 'company' }
   },
   {
+    path: '/company/training-tasks',
+    name: 'CompanyTrainingTasks',
+    component: () => import('@/views/shared/TrainingTasksWorkspace.vue'),
+    meta: { requiresAuth: true, role: 'company' }
+  },
+  {
     path: '/company/reports',
     name: 'CompanyReports',
     component: () => import('@/views/company/Reports.vue'),
@@ -262,6 +268,12 @@ const routes = [
     path: '/company/trello-settings',
     name: 'TrelloSettings',
     component: () => import('@/views/company/TrelloSettings.vue'),
+    meta: { requiresAuth: true, role: 'company' }
+  },
+  {
+    path: '/company/trello/callback',
+    name: 'TrelloCallback',
+    component: () => import('@/views/company/TrelloCallback.vue'),
     meta: { requiresAuth: true, role: 'company' }
   },
 

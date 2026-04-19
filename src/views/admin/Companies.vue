@@ -29,6 +29,9 @@
             </tr>
           </thead>
           <tbody>
+            <tr v-if="companies.length === 0">
+              <td colspan="5" class="text-muted text-center py-4">{{ t('no_companies') || 'لا توجد شركات' }}</td>
+            </tr>
             <tr v-for="company in companies" :key="company.id">
               <td class="fw-semibold">{{ company.company_name || company.name }}</td>
               <td>{{ company.email }}</td>
@@ -36,7 +39,7 @@
               <td>{{ formatDate(company.created_at) }}</td>
               <td>
                 <div class="d-flex gap-2">
-                  <template v-if="(company.status || 'pending') === 'pending'">
+                  <template v-if="isPending(company)">
                     <button class="btn btn-sm btn-success" @click="setStatus(company.id, 'active')"><i class="bi bi-check-lg"></i></button>
                     <button class="btn btn-sm btn-warning" @click="setStatus(company.id, 'reject')"><i class="bi bi-x-lg"></i></button>
                   </template>
@@ -102,6 +105,8 @@ const displayStatus = (status) => {
   if (status === 'rejected') return t('rejected')
   return status
 }
+
+const isPending = (company) => !company.status || company.status === 'pending'
 
 onMounted(loadCompanies)
 </script>

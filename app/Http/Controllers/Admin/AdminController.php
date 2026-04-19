@@ -47,19 +47,23 @@ class AdminController extends Controller
             ->get();
 
         if ($request->expectsJson() || $request->ajax()) {
-            $pendingCompaniesCount = User::where('role', 'company')->where('status', 'pending')->count();
+            $pendingCompaniesQuery = User::select('id', 'company_name', 'name', 'email', 'status')
+                ->where('role', 'company')
+                ->where(function ($query) {
+                    $query->where('status', 'pending')
+                        ->orWhereNull('status')
+                        ->orWhere('status', '');
+                });
 
             return response()->json([
                 'stats' => [
                     'total_users' => $totalUsers,
                     'total_companies' => $totalCompanies,
                     'total_all' => $totalAll,
-                    'pending_companies' => $pendingCompaniesCount,
+                    'pending_companies' => (clone $pendingCompaniesQuery)->count(),
                 ],
                 'recent_activities' => $recentActivities,
-                'pending_companies' => User::select('id', 'company_name', 'name', 'email', 'industry', 'status')
-                    ->where('role', 'company')
-                    ->where('status', 'pending')
+                'pending_companies' => $pendingCompaniesQuery
                     ->latest()
                     ->take(8)
                     ->get(),
@@ -103,7 +107,13 @@ class AdminController extends Controller
         $companies = User::where('role', 'company')->latest()->get();
         $totalCompanies = User::where('role', 'company')->count();
         $approvedCompanies = User::where('role', 'company')->where('status', 'active')->count();
-        $pendingCompanies = User::where('role', 'company')->where('status', 'pending')->count();
+        $pendingCompanies = User::where('role', 'company')
+            ->where(function ($query) {
+                $query->where('status', 'pending')
+                    ->orWhereNull('status')
+                    ->orWhere('status', '');
+            })
+            ->count();
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([

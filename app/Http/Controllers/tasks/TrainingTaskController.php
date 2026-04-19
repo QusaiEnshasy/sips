@@ -12,6 +12,7 @@ use App\Services\NotificationService;
 use App\Services\TrainingEvaluationNotifier;
 use App\Services\TrelloService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -24,8 +25,14 @@ class TrainingTaskController extends Controller
     ) {
     }
 
-    public function workspace(Request $request): RedirectResponse
+    public function workspace(Request $request)
     {
+        if ($request->expectsJson() || $request->ajax()) {
+            return $this->workspaceData($request);
+        }
+
+        return view('spa');
+
         $user = $request->user();
 
         if ($user->role === 'supervisor') {
@@ -54,6 +61,157 @@ class TrainingTaskController extends Controller
         $this->trainingEvaluationNotifier->notifyIfTrainingEnded($application);
 
         return redirect()->route('tasks.board', $application->id);
+    }
+
+    public function storeWorkspaceTask(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->role === 'company', 403);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'details' => ['nullable', 'string', 'max:5000'],
+            'due_date' => ['nullable', 'date'],
+            'label' => ['nullable', 'in:red,green,blue'],
+            'application_ids' => ['required', 'array', 'min:1'],
+            'application_ids.*' => ['integer'],
+        ]);
+
+        $applications = Application::with(['student', 'opportunity'])
+            ->where('company_status', 'approved')
+            ->where('supervisor_status', 'approved')
+            ->where('final_status', 'approved')
+            ->whereNull('training_completed_at')
+            ->whereIn('id', $validated['application_ids'])
+            ->whereHas('opportunity', fn (Builder $q) => $q->where('company_user_id', $user->id))
+            ->get();
+
+        if ($applications->isEmpty()) {
+            return response()->json([
+                'message' => 'لا يوجد طلاب تدريب معتمدون لإنشاء المهمة لهم.',
+            ], 422);
+        }
+
+        $createdCount = 0;
+
+        foreach ($applications as $application) {
+            if ($this->isTrainingEnded($application)) {
+                continue;
+            }
+
+            $task = Task::create([
+                'application_id' => $application->id,
+                'company_user_id' => $user->id,
+                'created_by' => $user->id,
+                'title' => trim($validated['title']),
+                'details' => $validated['details'] ?: null,
+                'due_date' => $validated['due_date'] ?: null,
+                'label' => $validated['label'] ?: null,
+                'assigned_user' => $application->student?->name,
+                'status' => 'todo',
+                'source' => 'manual',
+                'order' => (Task::where('application_id', $application->id)->where('status', 'todo')->max('order') ?? 0) + 1,
+            ]);
+
+            $this->attachTaskToStudent($task, $application->student_id ? (int) $application->student_id : null);
+            $createdCount++;
+
+            if ($application->student_id) {
+                $this->notifications->notifyUser(
+                    userId: (int) $application->student_id,
+                    title: 'New Training Task',
+                    description: 'تمت إضافة مهمة تدريب جديدة من الشركة.',
+                    type: 'info',
+                    meta: ['category' => 'task']
+                );
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'تم إنشاء المهمة لكل طالب بشكل منفصل.',
+            'created_count' => $createdCount,
+        ], 201);
+    }
+
+    public function submitWorkspaceTask(Request $request, Task $task): JsonResponse
+    {
+        $task->load(['application.student', 'attachments']);
+        $application = $task->application;
+
+        abort_if(! $application, 404);
+        $this->authorizeApplication($request, $application);
+        $this->ensureTrainingOpen($application);
+        abort_unless($request->user()->role === 'student', 403);
+        abort_unless($task->assignedStudents()->where('users.id', $request->user()->id)->exists(), 403);
+
+        $validated = $request->validate([
+            'student_solution' => ['required', 'string', 'max:5000'],
+            'attachments.*' => ['nullable', 'file', 'max:10240'],
+        ]);
+
+        $task->update([
+            'student_solution' => trim($validated['student_solution']),
+            'status' => 'done',
+        ]);
+
+        foreach ((array) $request->file('attachments', []) as $file) {
+            $path = $file->store('attachments', 'public');
+            $task->attachments()->create([
+                'user_id' => $request->user()->id,
+                'filename' => $file->getClientOriginalName(),
+                'filepath' => $path,
+            ]);
+        }
+
+        $this->notifyTaskSubmissionReviewers($application);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'تم تسليم المهمة بنجاح.',
+            'task' => $this->formatWorkspaceTask($task->fresh(['application.student', 'application.opportunity.companyUser', 'assignedStudents', 'attachments.user'])),
+        ]);
+    }
+
+    public function gradeWorkspaceTask(Request $request, Task $task): JsonResponse
+    {
+        $task->load(['application.student', 'application.opportunity']);
+        $application = $task->application;
+
+        abort_if(! $application, 404);
+        $this->authorizeApplication($request, $application);
+        abort_unless(in_array($request->user()->role, ['company', 'supervisor', 'admin'], true), 403);
+
+        $validated = $request->validate([
+            'score' => ['required', 'integer', 'min:0', 'max:50'],
+        ]);
+
+        if ($request->user()->role === 'company') {
+            $task->company_score = $validated['score'];
+        } elseif ($request->user()->role === 'supervisor') {
+            $task->supervisor_score = $validated['score'];
+        } else {
+            $task->company_score = $validated['score'];
+            $task->supervisor_score = $validated['score'];
+        }
+
+        $task->save();
+
+        if ($application->student_id) {
+            $this->notifications->notifyUser(
+                userId: (int) $application->student_id,
+                title: 'Training Task Evaluated',
+                description: 'تم تقييم إحدى مهام التدريب الخاصة بك.',
+                type: 'success',
+                meta: ['category' => 'evaluation']
+            );
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'تم حفظ التقييم.',
+            'task' => $this->formatWorkspaceTask($task->fresh(['application.student', 'application.opportunity.companyUser', 'assignedStudents', 'attachments.user'])),
+        ]);
     }
 
     public function adminWorkspace(Request $request)
@@ -295,6 +453,164 @@ class TrainingTaskController extends Controller
         }
 
         $task->assignedStudents()->syncWithoutDetaching([$studentId]);
+    }
+
+    private function workspaceData(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(in_array($user->role, ['company', 'student', 'supervisor', 'admin'], true), 403);
+
+        $tasksQuery = Task::with([
+            'application.student:id,name,email,supervisor_code',
+            'application.opportunity.companyUser:id,name,company_name,email',
+            'assignedStudents:id,name,email',
+            'attachments.user:id,name,role',
+        ]);
+
+        $approvedApplicationsQuery = Application::with([
+            'student:id,name,email,supervisor_code',
+            'opportunity:id,title,company_user_id,duration',
+        ])
+            ->where('company_status', 'approved')
+            ->where('supervisor_status', 'approved')
+            ->where('final_status', 'approved');
+
+        if ($user->role === 'company') {
+            $tasksQuery->where(function (Builder $query) use ($user) {
+                $query->where('company_user_id', $user->id)
+                    ->orWhereHas('application.opportunity', fn (Builder $q) => $q->where('company_user_id', $user->id));
+            });
+
+            $approvedApplicationsQuery->whereHas('opportunity', fn (Builder $q) => $q->where('company_user_id', $user->id));
+        } elseif ($user->role === 'student') {
+            $tasksQuery->where(function (Builder $query) use ($user) {
+                $query->whereHas('assignedStudents', fn (Builder $q) => $q->where('users.id', $user->id))
+                    ->orWhereHas('application', fn (Builder $q) => $q->where('student_id', $user->id));
+            });
+
+            $approvedApplicationsQuery->where('student_id', $user->id);
+        } elseif ($user->role === 'supervisor') {
+            $tasksQuery->whereHas('application.student', function (Builder $query) use ($user) {
+                $query->where('supervisor_code', $user->supervisor_code);
+            });
+
+            $approvedApplicationsQuery->whereHas('student', function (Builder $query) use ($user) {
+                $query->where('supervisor_code', $user->supervisor_code);
+            });
+        }
+
+        $tasks = $tasksQuery
+            ->latest()
+            ->get()
+            ->map(fn (Task $task) => $this->formatWorkspaceTask($task))
+            ->values();
+
+        $approvedApplications = $approvedApplicationsQuery
+            ->whereNull('training_completed_at')
+            ->latest()
+            ->get()
+            ->map(fn (Application $application) => $this->formatWorkspaceApplication($application))
+            ->values();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'role' => $user->role,
+                'applications' => $approvedApplications,
+                'tasks' => $tasks,
+                'stats' => [
+                    'total' => $tasks->count(),
+                    'todo' => $tasks->where('status', 'todo')->count(),
+                    'progress' => $tasks->where('status', 'progress')->count(),
+                    'done' => $tasks->where('status', 'done')->count(),
+                    'submitted' => $tasks->where('submitted', true)->count(),
+                    'graded' => $tasks->filter(fn ($task) => $task['company_score'] !== null || $task['supervisor_score'] !== null)->count(),
+                ],
+            ],
+        ]);
+    }
+
+    private function formatWorkspaceApplication(Application $application): array
+    {
+        return [
+            'id' => $application->id,
+            'student_id' => $application->student_id,
+            'student_name' => $application->student?->name,
+            'student_email' => $application->student?->email,
+            'program_title' => $application->opportunity?->title,
+            'training_end_date' => optional($this->getTrainingEndDate($application))->toDateString(),
+            'board_url' => route('tasks.board', ['application' => $application->id]),
+        ];
+    }
+
+    private function formatWorkspaceTask(Task $task): array
+    {
+        $application = $task->application;
+        $student = $application?->student;
+        $company = $application?->opportunity?->companyUser;
+        $attachments = $task->attachments->map(fn ($attachment) => [
+            'id' => $attachment->id,
+            'filename' => $attachment->filename,
+            'url' => asset('storage/' . ltrim((string) $attachment->filepath, '/')),
+            'uploaded_by' => $attachment->user?->name,
+        ])->values();
+
+        return [
+            'id' => $task->id,
+            'application_id' => $task->application_id,
+            'title' => $task->title,
+            'details' => $task->details,
+            'status' => $task->status,
+            'label' => $task->label,
+            'due_date' => optional($task->due_date)->toDateString(),
+            'student_solution' => $task->student_solution,
+            'submitted' => filled($task->student_solution) || $attachments->isNotEmpty(),
+            'company_score' => $task->company_score,
+            'supervisor_score' => $task->supervisor_score,
+            'source' => $task->source ?? 'manual',
+            'created_at' => optional($task->created_at)->toDateTimeString(),
+            'updated_at' => optional($task->updated_at)->toDateTimeString(),
+            'board_url' => $application ? route('tasks.board', ['application' => $application->id]) : null,
+            'student' => $student ? [
+                'id' => $student->id,
+                'name' => $student->name,
+                'email' => $student->email,
+            ] : null,
+            'program' => $application?->opportunity?->title,
+            'company' => $company ? ($company->company_name ?: $company->name) : null,
+            'assigned_students' => $task->assignedStudents->map(fn ($student) => [
+                'id' => $student->id,
+                'name' => $student->name,
+                'email' => $student->email,
+            ])->values(),
+            'attachments' => $attachments,
+        ];
+    }
+
+    private function notifyTaskSubmissionReviewers(Application $application): void
+    {
+        $recipients = [];
+        $companyId = (int) optional($application->opportunity)->company_user_id;
+
+        if ($companyId > 0) {
+            $recipients[] = $companyId;
+        }
+
+        $supervisor = $application->student?->supervisor_code
+            ? User::where('role', 'supervisor')->where('supervisor_code', $application->student->supervisor_code)->first()
+            : null;
+
+        if ($supervisor) {
+            $recipients[] = (int) $supervisor->id;
+        }
+
+        $this->notifications->notifyMany(
+            userIds: array_values(array_unique($recipients)),
+            title: 'Training Task Submitted',
+            description: 'قام الطالب بتسليم مهمة تدريبية جديدة.',
+            type: 'success',
+            meta: ['category' => 'task']
+        );
     }
 
     private function ensureTrainingOpen(Application $application): void

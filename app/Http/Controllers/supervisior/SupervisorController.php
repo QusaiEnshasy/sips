@@ -244,6 +244,7 @@ class SupervisorController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
+                'supervisor_code' => $supervisor->supervisor_code,
                 'quick_stats' => [
                     'total_students' => $totalStudents,
                     'pending_students' => $pendingStudents,

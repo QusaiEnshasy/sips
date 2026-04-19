@@ -89,6 +89,14 @@ const loadDashboard = async () => {
     stats.value = data.stats || stats.value
     pendingCompanies.value = data.pending_companies || []
     recentActivities.value = data.recent_activities || []
+
+    if ((stats.value.pending_companies || 0) > 0 && pendingCompanies.value.length === 0) {
+      const companiesResponse = await adminAPI.getCompanies()
+      const companies = companiesResponse.data.companies || []
+      pendingCompanies.value = companies
+        .filter((company) => !company.status || company.status === 'pending')
+        .slice(0, 8)
+    }
   } finally {
     loading.value = false
   }

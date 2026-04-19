@@ -11,8 +11,11 @@ use App\Models\TrelloSyncLog;
 use App\Services\TrelloService;
 use App\Services\TrelloTaskSyncService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CompanyTrelloController extends Controller
@@ -49,6 +52,228 @@ class CompanyTrelloController extends Controller
                 'webhook_callback_url' => $integration ? route('trello.webhook', ['integration' => $integration->id]) : null,
                 'is_active' => (bool) $integration?->is_active,
                 'last_synced_at' => optional($integration?->last_synced_at)->toISOString(),
+            ],
+        ]);
+    }
+
+    public function authorizeUrl(Request $request): JsonResponse
+    {
+        $data = $this->buildOAuthAuthorizePayload($request);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data,
+        ]);
+    }
+
+    public function connect(Request $request): RedirectResponse
+    {
+        $data = $this->buildOAuthAuthorizePayload($request);
+
+        return redirect()->away($data['authorize_url']);
+    }
+
+    private function buildOAuthAuthorizePayload(Request $request): array
+    {
+        $this->companyUserId();
+
+        $apiKey = (string) config('services.trello.key');
+        $apiSecret = (string) config('services.trello.secret');
+        abort_if($apiKey === '' || $apiSecret === '', 422, 'Trello API key/secret are missing from the system settings.');
+
+        $callbackUrl = route('company.trello.oauth.finalize');
+        $requestToken = $this->requestOAuthToken($callbackUrl);
+
+        $request->session()->put("trello_oauth_secret.{$requestToken['oauth_token']}", $requestToken['oauth_token_secret']);
+
+        $authorizeUrl = 'https://trello.com/1/OAuthAuthorizeToken?' . http_build_query([
+            'oauth_token' => $requestToken['oauth_token'],
+            'name' => 'TrainEd Company Trello Integration',
+            'scope' => 'read,write,account',
+            'expiration' => 'never',
+        ]);
+
+        return [
+            'authorize_url' => $authorizeUrl,
+            'return_url' => $callbackUrl,
+            'oauth_token' => $requestToken['oauth_token'],
+        ];
+    }
+
+    public function completePinAuthorization(Request $request): JsonResponse
+    {
+        $companyId = $this->companyUserId();
+        $validated = $request->validate([
+            'oauth_verifier' => ['required', 'string', 'max:255'],
+        ]);
+
+        $oauthToken = (string) $request->session()->pull('trello_oauth_pin_token', '');
+        $tokenSecret = $oauthToken !== ''
+            ? (string) $request->session()->pull("trello_oauth_secret.{$oauthToken}", '')
+            : '';
+
+        abort_if($oauthToken === '' || $tokenSecret === '', 422, 'Trello authorization session expired. Start the connection again.');
+
+        $accessToken = $this->exchangeOAuthToken($oauthToken, $tokenSecret, trim($validated['oauth_verifier']));
+        $temporaryIntegration = new TrelloIntegration([
+            'company_user_id' => $companyId,
+            'trello_token' => $accessToken['oauth_token'],
+        ]);
+
+        $profile = $this->trello->getMemberProfile($temporaryIntegration);
+        abort_if(empty($profile['id']), 422, 'Failed to verify Trello authorization.');
+
+        $companyEmail = strtolower((string) (Auth::user()?->email ?? ''));
+        $trelloEmail = strtolower((string) ($profile['email'] ?? ''));
+
+        if ($companyEmail !== '' && $trelloEmail !== '' && $companyEmail !== $trelloEmail) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Trello account email must match the company account email.',
+            ], 422);
+        }
+
+        $integration = TrelloIntegration::query()->updateOrCreate(
+            ['company_user_id' => $companyId],
+            [
+                'trello_api_key' => null,
+                'trello_token' => $accessToken['oauth_token'],
+                'trello_member_id' => (string) $profile['id'],
+                'is_active' => true,
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Trello connected successfully.',
+            'data' => [
+                'integration_id' => $integration->id,
+                'member_id' => $integration->trello_member_id,
+            ],
+        ]);
+    }
+
+    public function finalizeOAuth(Request $request)
+    {
+        $companyId = $this->companyUserId();
+        $oauthToken = (string) $request->query('oauth_token');
+        $oauthVerifier = (string) $request->query('oauth_verifier');
+        $oauthDenied = (string) $request->query('oauth_problem');
+
+        Log::info('Trello OAuth callback received.', [
+            'company_user_id' => $companyId,
+            'has_oauth_token' => $oauthToken !== '',
+            'has_oauth_verifier' => $oauthVerifier !== '',
+            'oauth_problem' => $oauthDenied ?: null,
+        ]);
+
+        if ($oauthDenied !== '') {
+            return redirect('/company/trello-settings?trello_error=' . urlencode($oauthDenied));
+        }
+
+        if ($oauthToken === '' || $oauthVerifier === '') {
+            return redirect('/company/trello-settings?trello_error=missing_oauth_data');
+        }
+
+        $tokenSecret = (string) $request->session()->pull("trello_oauth_secret.{$oauthToken}", '');
+        if ($tokenSecret === '') {
+            Log::warning('Trello OAuth session secret missing.', [
+                'company_user_id' => $companyId,
+            ]);
+
+            return redirect('/company/trello-settings?trello_error=session_expired');
+        }
+
+        try {
+            $accessToken = $this->exchangeOAuthToken($oauthToken, $tokenSecret, $oauthVerifier);
+            $temporaryIntegration = new TrelloIntegration([
+                'company_user_id' => $companyId,
+                'trello_token' => $accessToken['oauth_token'],
+            ]);
+
+            $profile = $this->trello->getMemberProfile($temporaryIntegration);
+            if (empty($profile['id'])) {
+                return redirect('/company/trello-settings?trello_error=profile_failed');
+            }
+
+            $companyEmail = strtolower((string) (Auth::user()?->email ?? ''));
+            $trelloEmail = strtolower((string) ($profile['email'] ?? ''));
+
+            if ($companyEmail !== '' && $trelloEmail !== '' && $companyEmail !== $trelloEmail) {
+                Log::warning('Trello OAuth email mismatch.', [
+                    'company_user_id' => $companyId,
+                    'company_email' => $companyEmail,
+                    'trello_email' => $trelloEmail,
+                ]);
+
+                return redirect('/company/trello-settings?trello_error=email_mismatch');
+            }
+
+            TrelloIntegration::query()->updateOrCreate(
+                ['company_user_id' => $companyId],
+                [
+                    'trello_api_key' => null,
+                    'trello_token' => $accessToken['oauth_token'],
+                    'trello_member_id' => (string) $profile['id'],
+                    'is_active' => true,
+                ]
+            );
+
+            return redirect('/company/trello-settings?trello_connected=1');
+        } catch (\Throwable $e) {
+            Log::error('Trello OAuth finalize failed.', [
+                'company_user_id' => $companyId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return redirect('/company/trello-settings?trello_error=oauth_failed');
+        }
+    }
+
+    public function completeAuthorization(Request $request): JsonResponse
+    {
+        $companyId = $this->companyUserId();
+        $validated = $request->validate([
+            'trello_token' => ['required', 'string', 'max:512'],
+        ]);
+
+        $token = trim($validated['trello_token']);
+        $temporaryIntegration = new TrelloIntegration([
+            'company_user_id' => $companyId,
+            'trello_token' => $token,
+        ]);
+
+        $profile = $this->trello->getMemberProfile($temporaryIntegration);
+        abort_if(empty($profile['id']), 422, 'Failed to verify Trello authorization.');
+
+        $companyEmail = strtolower((string) (Auth::user()?->email ?? ''));
+        $trelloEmail = strtolower((string) ($profile['email'] ?? ''));
+
+        if ($companyEmail !== '' && $trelloEmail !== '' && $companyEmail !== $trelloEmail) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Trello account email must match the company account email.',
+            ], 422);
+        }
+
+        $integration = TrelloIntegration::query()->updateOrCreate(
+            ['company_user_id' => $companyId],
+            [
+                'trello_api_key' => null,
+                'trello_token' => $token,
+                'trello_member_id' => (string) $profile['id'],
+                'is_active' => true,
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Trello connected successfully.',
+            'data' => [
+                'integration_id' => $integration->id,
+                'member_id' => $integration->trello_member_id,
+                'username' => $profile['username'] ?? null,
+                'full_name' => $profile['fullName'] ?? null,
             ],
         ]);
     }
@@ -420,5 +645,74 @@ class CompanyTrelloController extends Controller
                 'message' => $message,
                 'finished_at' => now(),
             ]);
+    }
+
+    private function requestOAuthToken(string $callbackUrl): array
+    {
+        $response = $this->signedOAuthRequest(
+            'POST',
+            'https://trello.com/1/OAuthGetRequestToken',
+            ['oauth_callback' => $callbackUrl]
+        );
+
+        abort_if(empty($response['oauth_token']) || empty($response['oauth_token_secret']), 422, 'Trello did not return a request token.');
+
+        return $response;
+    }
+
+    private function exchangeOAuthToken(string $oauthToken, string $tokenSecret, string $oauthVerifier): array
+    {
+        $response = $this->signedOAuthRequest(
+            'POST',
+            'https://trello.com/1/OAuthGetAccessToken',
+            [
+                'oauth_token' => $oauthToken,
+                'oauth_verifier' => $oauthVerifier,
+            ],
+            $tokenSecret
+        );
+
+        abort_if(empty($response['oauth_token']), 422, 'Trello did not return an access token.');
+
+        return $response;
+    }
+
+    private function signedOAuthRequest(string $method, string $url, array $params = [], string $tokenSecret = ''): array
+    {
+        $oauthParams = array_merge([
+            'oauth_consumer_key' => (string) config('services.trello.key'),
+            'oauth_nonce' => Str::random(32),
+            'oauth_signature_method' => 'HMAC-SHA1',
+            'oauth_timestamp' => (string) time(),
+            'oauth_version' => '1.0',
+        ], $params);
+
+        $signatureParams = $oauthParams;
+        ksort($signatureParams);
+
+        $baseParts = [
+            strtoupper($method),
+            $url,
+            http_build_query($signatureParams, '', '&', PHP_QUERY_RFC3986),
+        ];
+
+        $baseString = implode('&', array_map('rawurlencode', $baseParts));
+        $signingKey = rawurlencode((string) config('services.trello.secret')) . '&' . rawurlencode($tokenSecret);
+        $oauthParams['oauth_signature'] = base64_encode(hash_hmac('sha1', $baseString, $signingKey, true));
+
+        $response = Http::asForm()
+            ->timeout(20)
+            ->withHeaders([
+                'Authorization' => 'OAuth ' . collect($oauthParams)
+                    ->map(fn ($value, $key) => rawurlencode($key) . '="' . rawurlencode((string) $value) . '"')
+                    ->implode(', '),
+            ])
+            ->send(strtoupper($method), $url);
+
+        $response->throw();
+
+        parse_str($response->body(), $parsed);
+
+        return $parsed;
     }
 }

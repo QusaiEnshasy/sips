@@ -149,6 +149,15 @@ const dashboardPath = computed(() => {
   return paths[authStore.userType] || '/login'
 })
 
+const isSupervisor = computed(() => {
+  const role = authStore.user?.role || authStore.user?.type || authStore.userType
+  return role === 'supervisor'
+})
+
+const supervisorCode = computed(() => authStore.user?.supervisor_code || '')
+
+const userAvatar = computed(() => authStore.user?.avatar || authStore.user?.profile_photo_url || '')
+
 const copySupervisorCode = async () => {
   if (!supervisorCode.value) return
   try {

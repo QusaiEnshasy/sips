@@ -5,6 +5,13 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <title>{{ config('app.name', 'Laravel') }}</title>
+        <script>
+            (function () {
+                if (window.location.hash && window.location.hash.includes('token=')) {
+                    window.location.replace('/company/trello/callback' + window.location.hash);
+                }
+            })();
+        </script>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">

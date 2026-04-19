@@ -20,8 +20,55 @@
     </div>
 
     <div class="row g-4">
-      <!-- API Settings Card -->
+      <!-- Official Trello Authorization Card -->
       <div class="col-lg-6">
+        <div class="settings-card" data-aos="fade-up">
+          <div class="card-header-custom">
+            <i class="bi bi-shield-lock"></i>
+            <h5 class="fw-bold mb-0">الربط الرسمي مع Trello</h5>
+          </div>
+
+          <div v-if="hasTrello" class="connected-oauth-box mb-4">
+            <div>
+              <strong>حساب Trello مربوط</strong>
+              <span>التوكن محفوظ تلقائيا بالخلفية ومشفر داخل النظام.</span>
+            </div>
+            <i class="bi bi-check2-circle"></i>
+          </div>
+
+          <div v-else class="alert-info mb-4">
+            <i class="bi bi-info-circle me-2"></i>
+            اضغط الزر وسيفتح Trello بشكل طبيعي. بعد الموافقة سيرجعك للنظام ويحفظ Token تلقائيا بدون نسخه أو كتابته.
+          </div>
+
+          <div class="d-flex gap-3 flex-wrap">
+            <button class="btn-accent-gradient" @click="connectWithTrello" :disabled="isAuthorizing">
+              <span v-if="isAuthorizing" class="spinner-border spinner-border-sm me-2"></span>
+              <i v-else class="bi bi-box-arrow-up-right me-2"></i>
+              {{ hasTrello ? 'إعادة ربط Trello' : 'الدخول إلى Trello وربط الحساب' }}
+            </button>
+
+            <button v-if="hasTrello" class="btn-outline" @click="testConnection" :disabled="isTesting">
+              <span v-if="isTesting" class="spinner-border spinner-border-sm me-2"></span>
+              <i v-else class="bi bi-plug me-2"></i>
+              اختبار الاتصال
+            </button>
+
+            <button v-if="hasTrello" class="btn-outline text-danger" @click="disconnectTrello">
+              <i class="bi bi-unlink me-2"></i>
+              فصل Trello
+            </button>
+          </div>
+
+          <div v-if="connectionStatus" class="connection-status mt-3" :class="connectionStatusClass">
+            <i :class="connectionStatusIcon"></i>
+            {{ connectionStatus }}
+          </div>
+        </div>
+      </div>
+
+      <!-- API Settings Card -->
+      <div v-if="false" class="col-lg-6">
         <div class="settings-card" data-aos="fade-up">
           <div class="card-header-custom">
             <i class="bi bi-key"></i>
@@ -301,6 +348,8 @@ import AOS from 'aos'
 const { t, formatDate } = useI18n()
 
 // State
+const hasTrello = ref(false)
+const isAuthorizing = ref(false)
 const apiKey = ref('')
 const apiToken = ref('')
 const showToken = ref(false)
@@ -333,11 +382,39 @@ const connectionStatusIcon = computed(() => {
   return 'bi bi-info-circle'
 })
 
+const trelloOAuthMessages = {
+  email_mismatch: 'حساب Trello يجب أن يكون بنفس إيميل حساب الشركة داخل النظام.',
+  missing_oauth_data: 'Trello لم يرجع بيانات الربط المطلوبة. حاول الربط مرة أخرى.',
+  session_expired: 'انتهت جلسة الربط. اضغط ربط Trello مرة أخرى من نفس المتصفح.',
+  profile_failed: 'تمت الموافقة لكن تعذر قراءة بيانات حساب Trello.',
+  oauth_failed: 'تمت الموافقة لكن فشل حفظ الربط. سنعرض السبب في سجل Laravel.',
+  access_denied: 'تم إلغاء الموافقة من Trello.',
+}
+
+const handleTrelloOAuthResult = () => {
+  const params = new URLSearchParams(window.location.search)
+  const connected = params.get('trello_connected')
+  const error = params.get('trello_error')
+
+  if (connected) {
+    connectionStatus.value = 'تم ربط Trello بنجاح وحفظ التوكن بالخلفية.'
+    connectionStatusClass.value = 'text-success'
+  } else if (error) {
+    connectionStatus.value = trelloOAuthMessages[error] || `تعذر ربط Trello: ${error}`
+    connectionStatusClass.value = 'text-danger'
+  } else {
+    return
+  }
+
+  window.history.replaceState({}, document.title, window.location.pathname)
+}
+
 // Methods
 const loadSettings = async () => {
   try {
     const response = await companyAPI.getTrelloSettings()
     const settings = response.data.data || {}
+    hasTrello.value = !!settings.has_trello
     apiKey.value = settings.has_trello ? '' : apiKey.value
     apiToken.value = ''
     webhookEnabled.value = !!settings.webhook_enabled
@@ -345,9 +422,40 @@ const loadSettings = async () => {
 
     if (settings.has_trello) {
       await loadBoards()
+    } else {
+      boards.value = []
     }
   } catch (error) {
     console.error('Failed to load Trello settings:', error)
+  }
+}
+
+const connectWithTrello = async () => {
+  isAuthorizing.value = true
+  connectionStatus.value = ''
+  window.location.href = '/company/trello/connect'
+  return
+
+  const verifier = window.prompt('بعد ما تضغط Allow في Trello، انسخ كود الموافقة الذي يظهر والصقه هنا. هذا ليس Token، فقط كود مؤقت لتوليد التوكن بالخلفية.')
+
+  if (!verifier) {
+    isAuthorizing.value = false
+    connectionStatus.value = 'تم إلغاء الربط. اضغط الزر مرة أخرى إذا أردت المحاولة.'
+    connectionStatusClass.value = 'text-info'
+    return
+  }
+
+  try {
+    await companyAPI.completeTrelloPinAuthorization({ oauth_verifier: verifier.trim() })
+    connectionStatus.value = 'تم ربط Trello بنجاح وحفظ التوكن بالخلفية.'
+    connectionStatusClass.value = 'text-success'
+    await loadSettings()
+    await loadIntegrations()
+  } catch (error) {
+    connectionStatus.value = error?.response?.data?.message || 'تعذر إكمال ربط Trello. تأكد من الكود وحاول مرة أخرى.'
+    connectionStatusClass.value = 'text-danger'
+  } finally {
+    isAuthorizing.value = false
   }
 }
 
@@ -520,6 +628,24 @@ const disableWebhook = async () => {
   }
 }
 
+const disconnectTrello = async () => {
+  if (!confirm('سيتم فصل حساب Trello من النظام. هل أنت متأكد؟')) return
+
+  try {
+    await companyAPI.disconnectTrello()
+    hasTrello.value = false
+    boards.value = []
+    integrations.value = []
+    syncLogs.value = []
+    webhookEnabled.value = false
+    webhookCallbackUrl.value = ''
+    connectionStatus.value = 'تم فصل Trello بنجاح.'
+    connectionStatusClass.value = 'text-success'
+  } catch (error) {
+    alert(error?.response?.data?.message || 'تعذر فصل Trello.')
+  }
+}
+
 const disconnectInternship = async (integration) => {
   if (confirm(t('confirm_disconnect'))) {
     try {
@@ -544,6 +670,7 @@ const closeConnectModal = () => {
 
 onMounted(() => {
   AOS.init({ duration: 800, once: true })
+  handleTrelloOAuthResult()
   loadSettings()
   loadIntegrations()
   loadSyncLogs()
@@ -652,6 +779,35 @@ onMounted(() => {
 .alert-info a {
   color: #0284c7;
   text-decoration: none;
+}
+
+.connected-oauth-box {
+  align-items: center;
+  background: #e8f8ef;
+  border: 1px solid #b7ebca;
+  border-radius: 16px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.connected-oauth-box strong {
+  color: #166534;
+  display: block;
+  font-weight: 800;
+}
+
+.connected-oauth-box span {
+  color: #3f7c56;
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.connected-oauth-box i {
+  color: #16a34a;
+  font-size: 30px;
 }
 
 .btn-accent-gradient {

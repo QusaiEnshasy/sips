@@ -81,9 +81,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/company/programs/{id}/delete', [JobController::class, 'deleteJob'])->name('company.programs.delete');
     Route::get('/company/applicants', [ApplicationsCompanyController::class, 'applicantsPage'])->name('company.applicants.index');
     Route::get('/company/applicants/{id}', [ApplicationsCompanyController::class, 'applicantDetails'])->name('company.applicants.show');
+    Route::view('/company/training-tasks', 'spa')->name('company.training-tasks');
     Route::view('/company/reports', 'spa')->name('company.reports');
     Route::get('/company/reports/data', [ReportsController::class, 'company'])->name('company.reports.data');
     Route::view('/company/trello-settings', 'spa')->name('company.trello-settings');
+    Route::view('/company/trello/callback', 'spa')->name('company.trello.callback');
+    Route::get('/company/trello/connect', [CompanyTrelloController::class, 'connect'])->name('company.trello.connect-oauth');
+    Route::get('/company/trello/authorize', [CompanyTrelloController::class, 'authorizeUrl'])->name('company.trello.authorize');
+    Route::get('/company/trello/oauth/finalize', [CompanyTrelloController::class, 'finalizeOAuth'])->name('company.trello.oauth.finalize');
+    Route::post('/company/trello/oauth/pin', [CompanyTrelloController::class, 'completePinAuthorization'])->name('company.trello.oauth.pin');
+    Route::post('/company/trello/oauth/callback', [CompanyTrelloController::class, 'completeAuthorization'])->name('company.trello.oauth.callback');
     Route::get('/company/trello/settings', [CompanyTrelloController::class, 'settings'])->name('company.trello.settings');
     Route::post('/company/trello/settings', [CompanyTrelloController::class, 'saveSettings'])->name('company.trello.settings.save');
     Route::post('/company/trello/test', [CompanyTrelloController::class, 'testConnection'])->name('company.trello.test');
@@ -156,6 +163,9 @@ Route::middleware('auth')->group(function () {
 
     // Training Tasks Workflow (Role-based + Trello sync)
     Route::get('/workspace/tasks', [TrainingTaskController::class, 'workspace'])->name('tasks.workspace');
+    Route::post('/workspace/tasks', [TrainingTaskController::class, 'storeWorkspaceTask'])->name('tasks.workspace.store');
+    Route::post('/workspace/tasks/{task}/submit', [TrainingTaskController::class, 'submitWorkspaceTask'])->name('tasks.workspace.submit');
+    Route::post('/workspace/tasks/{task}/grade', [TrainingTaskController::class, 'gradeWorkspaceTask'])->name('tasks.workspace.grade');
     Route::get('/admin/tasks/workspace', [TrainingTaskController::class, 'adminWorkspace'])->name('tasks.admin.workspace');
     Route::post('/admin/tasks/broadcast', [TrainingTaskController::class, 'adminBroadcastTask'])->name('tasks.admin.broadcast');
     Route::post('/supervisor/tasks/broadcast', [TrainingTaskController::class, 'supervisorBroadcastTask'])->name('tasks.supervisor.broadcast');

@@ -84,6 +84,7 @@ export function useI18n() {
     const forcedTranslations = {
       ar: {
         jisr_program: 'برنامج الجسر',
+        training_tasks: 'مهام التدريب',
         start_jisr_program: 'ابدأ برنامج الجسر',
         complete_tasks_to_advance: 'أكمل مهام برنامج الجسر للانتقال إلى المرحلة التالية',
         jisr_description: 'هذا المسار التأهيلي يساعدك على تطوير مهاراتك قبل العودة إلى المسار الأساسي',
@@ -91,6 +92,7 @@ export function useI18n() {
       },
       en: {
         jisr_program: 'Jisr Program',
+        training_tasks: 'Training Tasks',
         start_jisr_program: 'Start Jisr Program',
         complete_tasks_to_advance: 'Complete Jisr tasks to move to the next stage',
         jisr_description: 'This preparation path helps you improve your skills before returning to the main track',
