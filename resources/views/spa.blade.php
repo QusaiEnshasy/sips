@@ -9,6 +9,7 @@
     <meta http-equiv="Expires" content="0">
     <title>SIP - App</title>
     @php
+<<<<<<< Updated upstream
         $manifestPath = public_path('.vite/manifest.json');
         $manifest = file_exists($manifestPath)
             ? json_decode(file_get_contents($manifestPath), true)
@@ -20,6 +21,14 @@
             ->map(fn ($asset) => 'assets/' . basename($asset))
             ->values();
         $jsVersion = $jsAsset ? filemtime(public_path($jsAsset)) : time();
+=======
+        $vendorAsset = 'assets/vendor-DQfLmYUC.js';
+        $cssAsset = 'assets/index-Cxt7YYcM.css';
+        $jsAsset = 'assets/index-eB-YqcqT-trello.js';
+        $vendorVersion = file_exists(public_path($vendorAsset)) ? filemtime(public_path($vendorAsset)) : time();
+        $cssVersion = file_exists(public_path($cssAsset)) ? filemtime(public_path($cssAsset)) : time();
+        $jsVersion = file_exists(public_path($jsAsset)) ? filemtime(public_path($jsAsset)) : time();
+>>>>>>> Stashed changes
     @endphp
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -102,10 +111,34 @@
                 width: 100%;
             }
         }
+        .trello-fab {
+            position: fixed;
+            left: 18px;
+            bottom: 18px;
+            z-index: 9998;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            border: 0;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #0ea5e9, #2563eb);
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 10px 14px;
+            box-shadow: 0 10px 22px rgba(37, 99, 235, .35);
+            cursor: pointer;
+        }
+        .trello-fab i { font-size: 14px; }
+        .trello-fab.show { display: inline-flex; }
     </style>
 </head>
 <body style="margin:0;min-height:100vh;background:#f4f6fb;">
     <div id="app"></div>
+    <button type="button" id="trelloFab" class="trello-fab" title="Trello Settings">
+        <i class="bi bi-kanban"></i>
+        Trello
+    </button>
     <form id="globalLogoutForm" method="POST" action="{{ route('logout') }}" style="display:none;">
         @csrf
     </form>
@@ -206,6 +239,21 @@
             cancelBtn.addEventListener('click', closeModal);
             overlay.addEventListener('click', (e) => {
                 if (e.target === overlay) closeModal();
+            });
+        })();
+
+        (function () {
+            const trelloFab = document.getElementById('trelloFab');
+            if (!trelloFab) return;
+
+            const user = window.__AUTH_USER__;
+            const isCompany = user && (user.role === 'company' || user.type === 'company');
+
+            if (!isCompany) return;
+
+            trelloFab.classList.add('show');
+            trelloFab.addEventListener('click', function () {
+                window.location.href = '/company/trello-settings';
             });
         })();
     </script>
