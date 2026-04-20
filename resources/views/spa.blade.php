@@ -9,7 +9,6 @@
     <meta http-equiv="Expires" content="0">
     <title>SIP - App</title>
     @php
-<<<<<<< Updated upstream
         $manifestPath = public_path('.vite/manifest.json');
         $manifest = file_exists($manifestPath)
             ? json_decode(file_get_contents($manifestPath), true)
@@ -21,14 +20,6 @@
             ->map(fn ($asset) => 'assets/' . basename($asset))
             ->values();
         $jsVersion = $jsAsset ? filemtime(public_path($jsAsset)) : time();
-=======
-        $vendorAsset = 'assets/vendor-DQfLmYUC.js';
-        $cssAsset = 'assets/index-Cxt7YYcM.css';
-        $jsAsset = 'assets/index-eB-YqcqT-trello.js';
-        $vendorVersion = file_exists(public_path($vendorAsset)) ? filemtime(public_path($vendorAsset)) : time();
-        $cssVersion = file_exists(public_path($cssAsset)) ? filemtime(public_path($cssAsset)) : time();
-        $jsVersion = file_exists(public_path($jsAsset)) ? filemtime(public_path($jsAsset)) : time();
->>>>>>> Stashed changes
     @endphp
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
