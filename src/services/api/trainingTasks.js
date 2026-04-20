@@ -15,6 +15,7 @@ const webApi = axios.create({
 export const trainingTasksAPI = {
   getWorkspace: () => webApi.get('/workspace/tasks'),
   createTask: (data) => webApi.post('/workspace/tasks', data),
+  syncTasks: () => webApi.post('/workspace/tasks/sync'),
   submitTask: (taskId, data) => webApi.post(`/workspace/tasks/${taskId}/submit`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),

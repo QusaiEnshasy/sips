@@ -13,6 +13,8 @@ class TrelloInternshipLink extends Model
         'opportunity_id',
         'trello_list_id',
         'trello_list_name',
+        'assignment_mode',
+        'target_student_ids',
         'last_synced_at',
         'sync_status',
     ];
@@ -21,6 +23,7 @@ class TrelloInternshipLink extends Model
     {
         return [
             'last_synced_at' => 'datetime',
+            'target_student_ids' => 'array',
         ];
     }
 

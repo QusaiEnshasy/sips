@@ -326,8 +326,8 @@ class SupervisorController extends Controller
                     $q->where('supervisor_code', $supervisor->supervisor_code)
                         ->where('status', 'active');
                 })
-                ->where('company_status', 'approved')
                 ->where('supervisor_status', 'pending')
+                ->where('final_status', 'pending')
                 ->latest()
                 ->get();
 
@@ -355,6 +355,9 @@ class SupervisorController extends Controller
                         'student_name' => $app->student?->name,
                         'student_email' => $app->student?->email,
                         'program_title' => $app->opportunity?->title,
+                        'company_status' => $app->company_status,
+                        'supervisor_status' => $app->supervisor_status,
+                        'final_status' => $app->final_status,
                         'created_at' => optional($app->created_at)->toISOString(),
                     ])->values(),
                     'approved_students' => collect($approvedStudents)->map(function ($row) {

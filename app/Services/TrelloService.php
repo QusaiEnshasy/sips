@@ -173,6 +173,44 @@ class TrelloService
         ], $integration);
     }
 
+    public function findOrCreateBoardLabel(string $boardId, string $labelName, ?TrelloIntegration $integration = null): ?string
+    {
+        if (! $this->isConfigured($integration) || $boardId === '' || trim($labelName) === '') {
+            return null;
+        }
+
+        $labels = $this->get("/boards/{$boardId}/labels", [
+            'fields' => 'id,name,color',
+            'limit' => 1000,
+        ], $integration);
+
+        $existing = collect($labels)->first(function (array $label) use ($labelName) {
+            return mb_strtolower(trim((string) ($label['name'] ?? ''))) === mb_strtolower(trim($labelName));
+        });
+
+        if (! empty($existing['id'])) {
+            return (string) $existing['id'];
+        }
+
+        $created = $this->post("/boards/{$boardId}/labels", [
+            'name' => trim($labelName),
+            'color' => 'blue',
+        ], $integration);
+
+        return ! empty($created['id']) ? (string) $created['id'] : null;
+    }
+
+    public function addLabelToCard(string $cardId, string $labelId, ?TrelloIntegration $integration = null): array
+    {
+        if (! $this->isConfigured($integration) || $cardId === '' || $labelId === '') {
+            return [];
+        }
+
+        return $this->post("/cards/{$cardId}/idLabels", [
+            'value' => $labelId,
+        ], $integration);
+    }
+
     public function getCards(string $listId, ?TrelloIntegration $integration = null): array
     {
         if (! $this->isConfigured($integration) || $listId === '') {

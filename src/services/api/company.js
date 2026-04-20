@@ -41,6 +41,7 @@ export const companyAPI = {
   getTrelloLists: (boardId) => webApi.get(`/company/trello/boards/${boardId}/lists`),
   getTrelloIntegrations: () => webApi.get('/company/trello/integrations'),
   getTrelloSyncLogs: () => webApi.get('/company/trello/sync-logs'),
+  getInternshipStudents: (internshipId) => webApi.get(`/company/trello/internships/${internshipId}/students`),
   connectTrelloBoard: (internshipId, data) => webApi.post(`/company/trello/internships/${internshipId}/connect`, data),
   syncTrello: (internshipId) => webApi.post(`/company/trello/internships/${internshipId}/sync`),
   unlinkTrelloInternship: (internshipId) => webApi.delete(`/company/trello/internships/${internshipId}/unlink`),

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\tasks;
 
 use App\Http\Controllers\Controller;
 use App\Models\Application;
+use App\Models\InternshipOpportunity;
 use App\Models\Task;
+use App\Models\TaskUser;
 use App\Models\TrelloIntegration;
 use App\Models\TrelloInternshipLink;
 use App\Models\User;
@@ -45,14 +47,138 @@ class TrainingTaskController extends Controller
     public function storeWorkspaceTask(Request $request): JsonResponse
     {
         $user = $request->user();
-        abort_unless($user->role === 'company', 403);
+        abort_unless(in_array($user->role, ['company', 'supervisor'], true), 403);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'training_id' => ['required', 'integer', 'exists:internship_opportunities,id'],
+            'student_ids' => ['required', 'array', 'min:1'],
+            'student_ids.*' => ['required', 'integer', 'exists:users,id'],
+            'due_date' => ['nullable', 'date'],
+            'label' => ['nullable', 'in:red,green,blue'],
+        ]);
+
+        $training = InternshipOpportunity::query()->findOrFail((int) $validated['training_id']);
+        if ($user->role === 'company') {
+            abort_unless((int) $training->company_user_id === (int) $user->id, 403);
+        }
+
+        $studentIds = collect($validated['student_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($user->role === 'supervisor') {
+            $allowedCount = User::query()
+                ->whereIn('id', $studentIds)
+                ->where('role', 'student')
+                ->where('supervisor_code', $user->supervisor_code)
+                ->count();
+            abort_unless($allowedCount === $studentIds->count(), 403);
+        }
+
+        $applications = Application::query()
+            ->with('student')
+            ->where('opportunity_id', $training->id)
+            ->whereIn('student_id', $studentIds)
+            ->where('company_status', 'approved')
+            ->where('supervisor_status', 'approved')
+            ->where('final_status', 'approved')
+            ->whereNull('training_completed_at')
+            ->get()
+            ->keyBy('student_id');
+
+        abort_unless($applications->isNotEmpty(), 422, 'No active approved students in selected training.');
+
+        $integration = TrelloIntegration::query()
+            ->where('company_user_id', (int) $training->company_user_id)
+            ->where('is_active', true)
+            ->first();
+
+        $link = $integration
+            ? TrelloInternshipLink::query()
+                ->where('trello_integration_id', $integration->id)
+                ->where('opportunity_id', $training->id)
+                ->first()
+            : null;
+
+        $createdTasks = collect();
+
+        foreach ($studentIds as $studentId) {
+            $application = $applications->get($studentId);
+            if (! $application) {
+                continue;
+            }
+
+            $task = Task::query()->create([
+                'application_id' => $application->id,
+                'training_id' => $training->id,
+                'company_user_id' => (int) $training->company_user_id,
+                'created_by' => (int) $user->id,
+                'title' => trim((string) $validated['title']),
+                'description' => $validated['description'] ?? null,
+                'details' => $validated['description'] ?? null,
+                'due_date' => $validated['due_date'] ?? null,
+                'label' => $validated['label'] ?? null,
+                'status' => 'todo',
+                'source' => 'manual',
+                'assigned_user' => $application->student?->name,
+                'order' => ((int) Task::query()
+                    ->where('application_id', $application->id)
+                    ->where('status', 'todo')
+                    ->max('order')) + 1,
+            ]);
+
+            $task->assignedStudents()->syncWithoutDetaching([$studentId]);
+            TaskUser::query()
+                ->where('task_id', $task->id)
+                ->where('student_id', $studentId)
+                ->update(['status' => 'pending']);
+
+            $createdTasks->push($task);
+        }
+
+        $trelloCardId = null;
+        if ($integration && $link) {
+            $card = $this->trello->createCard(
+                listId: (string) $link->trello_list_id,
+                name: trim((string) $validated['title']),
+                desc: (string) ($validated['description'] ?? ''),
+                integration: $integration
+            );
+
+            if (! empty($card['id'])) {
+                $trelloCardId = (string) $card['id'];
+                $labelId = $integration->trello_board_id
+                    ? $this->trello->findOrCreateBoardLabel((string) $integration->trello_board_id, (string) $training->title, $integration)
+                    : null;
+
+                if ($labelId) {
+                    $this->trello->addLabelToCard($trelloCardId, $labelId, $integration);
+                }
+
+                Task::query()
+                    ->whereIn('id', $createdTasks->pluck('id')->all())
+                    ->update([
+                        'trello_card_id' => $trelloCardId,
+                        'trello_list_id' => (string) ($card['idList'] ?? $link->trello_list_id),
+                        'trello_integration_id' => $integration->id,
+                        'source' => 'trello',
+                        'trello_last_synced_at' => now(),
+                    ]);
+            }
+        }
 
         return response()->json([
-            'status' => 'error',
-            'message' => 'إنشاء مهام الشركة يتم من Trello الحقيقي فقط. أنشئ الكرت في Trello ثم اضغط مزامنة.',
-        ], 422);
+            'status' => 'success',
+            'message' => 'Task created successfully.',
+            'data' => [
+                'task_ids' => $createdTasks->pluck('id')->values(),
+                'trello_card_id' => $trelloCardId,
+            ],
+        ]);
     }
-
     public function submitWorkspaceTask(Request $request, Task $task): JsonResponse
     {
         $task->load(['application.student', 'attachments']);
@@ -74,6 +200,11 @@ class TrainingTaskController extends Controller
             'status' => 'done',
         ]);
 
+        TaskUser::query()
+            ->where('task_id', $task->id)
+            ->where('student_id', (int) $request->user()->id)
+            ->update(['status' => 'submitted']);
+
         foreach ((array) $request->file('attachments', []) as $file) {
             $path = $file->store('attachments', 'public');
             $task->attachments()->create([
@@ -84,6 +215,14 @@ class TrainingTaskController extends Controller
         }
 
         $this->syncStudentSubmissionToTrello($task->fresh(['attachments']), $application);
+        $integration = $this->resolveCompanyIntegration($application);
+        if ($integration && $task->trello_card_id) {
+            $this->trello->addCardComment(
+                (string) $task->trello_card_id,
+                'Student ' . $request->user()->name . ' has submitted this task ' . "\u{2705}",
+                $integration
+            );
+        }
         $this->notifyTaskSubmissionReviewers($application);
 
         return response()->json([
@@ -180,9 +319,11 @@ class TrainingTaskController extends Controller
 
             $task = Task::create([
                 'application_id' => $application->id,
+                'training_id' => (int) $application->opportunity_id,
                 'company_user_id' => (int) optional($application->opportunity)->company_user_id,
                 'created_by' => $request->user()->id,
                 'title' => trim($validated['title']),
+                'description' => $validated['details'] ?: null,
                 'details' => $validated['details'] ?: null,
                 'due_date' => $validated['due_date'] ?: null,
                 'label' => $validated['label'] ?: null,
@@ -262,9 +403,11 @@ class TrainingTaskController extends Controller
 
             $task = Task::create([
                 'application_id' => $application->id,
+                'training_id' => (int) $application->opportunity_id,
                 'company_user_id' => (int) optional($application->opportunity)->company_user_id,
                 'created_by' => $request->user()->id,
                 'title' => trim($validated['title']),
+                'description' => $validated['details'] ?: null,
                 'details' => $validated['details'] ?: null,
                 'due_date' => $validated['due_date'] ?: null,
                 'label' => $validated['label'] ?: null,
@@ -380,6 +523,10 @@ class TrainingTaskController extends Controller
         $user = $request->user();
         abort_unless(in_array($user->role, ['company', 'student', 'supervisor', 'admin'], true), 403);
 
+        if (in_array($user->role, ['company', 'supervisor', 'student'], true)) {
+            $this->syncTasksFromTrelloForUser($user);
+        }
+
         $tasksQuery = Task::with([
             'application.student:id,name,email,supervisor_code',
             'application.opportunity.companyUser:id,name,company_name,email',
@@ -404,10 +551,20 @@ class TrainingTaskController extends Controller
 
             $approvedApplicationsQuery->whereHas('opportunity', fn (Builder $q) => $q->where('company_user_id', $user->id));
         } elseif ($user->role === 'student') {
-            $tasksQuery->where(function (Builder $query) use ($user) {
-                $query->whereHas('assignedStudents', fn (Builder $q) => $q->where('users.id', $user->id))
-                    ->orWhereHas('application', fn (Builder $q) => $q->where('student_id', $user->id));
-            });
+            $trainingIds = Application::query()
+                ->where('student_id', $user->id)
+                ->where('company_status', 'approved')
+                ->where('supervisor_status', 'approved')
+                ->where('final_status', 'approved')
+                ->whereNull('training_completed_at')
+                ->pluck('opportunity_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $tasksQuery
+                ->whereIn('training_id', $trainingIds)
+                ->whereHas('assignedStudents', fn (Builder $q) => $q->where('users.id', $user->id));
 
             $approvedApplicationsQuery->where('student_id', $user->id);
         } elseif ($user->role === 'supervisor') {
@@ -455,6 +612,8 @@ class TrainingTaskController extends Controller
     {
         return [
             'id' => $application->id,
+            'training_id' => $application->opportunity_id,
+            'opportunity_id' => $application->opportunity_id,
             'student_id' => $application->student_id,
             'student_name' => $application->student?->name,
             'student_email' => $application->student?->email,
@@ -563,17 +722,195 @@ class TrainingTaskController extends Controller
 
         try {
             $this->trello->addCardComment((string) $task->trello_card_id, $comment, $integration);
+            $relatedTasks = Task::query()
+                ->with('application.student:id,name,email')
+                ->where('trello_integration_id', $integration->id)
+                ->where('trello_card_id', (string) $task->trello_card_id)
+                ->get();
+
+            $submittedCount = $relatedTasks
+                ->filter(fn (Task $relatedTask) => filled($relatedTask->student_solution))
+                ->count();
+
+            $totalCount = $relatedTasks->count();
+            $allSubmitted = $totalCount > 0 && $submittedCount >= $totalCount;
+
+            $statusLines = $relatedTasks->map(function (Task $relatedTask) {
+                $studentName = $relatedTask->application?->student?->name ?: 'Student';
+                $isSubmitted = filled($relatedTask->student_solution);
+                $mark = $isSubmitted ? '?' : '⬜';
+
+                return $mark . ' ' . $studentName . ' (ID: ' . (int) $relatedTask->application?->student_id . ')';
+            })->implode("\n");
+
             $completedDueDate = $task->due_date
                 ? $task->due_date->copy()->endOfDay()->toIso8601String()
                 : now()->toIso8601String();
 
+            $baseTitle = preg_replace('/^\[\d+\s*\/\s*\d+\]\s*/', '', (string) $task->title) ?: (string) $task->title;
+
             $this->trello->updateCard((string) $task->trello_card_id, [
                 'due' => $completedDueDate,
-                'dueComplete' => true,
+                'dueComplete' => $allSubmitted,
+                'name' => '[' . $submittedCount . '/' . max($totalCount, 1) . '] ' . $baseTitle,
+                'desc' => trim((string) ($task->details ?? '') . "\n\nSIPS Submission Progress:\n" . $statusLines),
             ], $integration);
         } catch (\Throwable) {
             // Keep the local submission saved even if Trello is temporarily unavailable.
         }
+    }
+
+    public function syncWorkspaceTasks(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(in_array($user->role, ['company', 'supervisor'], true), 403);
+
+        $result = $this->syncTasksFromTrelloForUser($user, true);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Trello sync completed.',
+            'data' => $result,
+        ]);
+    }
+
+    private function syncTasksFromTrelloForUser(User $user, bool $force = false): array
+    {
+        $linksQuery = TrelloInternshipLink::query()->with(['integration']);
+
+        if ($user->role === 'company') {
+            $linksQuery->whereHas('integration', function (Builder $query) use ($user) {
+                $query->where('company_user_id', $user->id)->where('is_active', true);
+            });
+        } elseif ($user->role === 'supervisor') {
+            $companyIds = Application::query()
+                ->whereHas('student', fn (Builder $q) => $q->where('supervisor_code', $user->supervisor_code))
+                ->join('internship_opportunities', 'internship_opportunities.id', '=', 'applications.opportunity_id')
+                ->distinct()
+                ->pluck('internship_opportunities.company_user_id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            $linksQuery->whereHas('integration', function (Builder $query) use ($companyIds) {
+                $query->whereIn('company_user_id', $companyIds)->where('is_active', true);
+            });
+        } elseif ($user->role === 'student') {
+            $trainingIds = Application::query()
+                ->where('student_id', $user->id)
+                ->where('company_status', 'approved')
+                ->where('supervisor_status', 'approved')
+                ->where('final_status', 'approved')
+                ->whereNull('training_completed_at')
+                ->pluck('opportunity_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($trainingIds->isEmpty()) {
+                return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+            }
+
+            $linksQuery->whereIn('opportunity_id', $trainingIds)
+                ->whereHas('integration', fn (Builder $query) => $query->where('is_active', true));
+        } else {
+            return ['created' => 0, 'updated' => 0, 'skipped' => 0];
+        }
+
+        $totals = ['created' => 0, 'updated' => 0, 'skipped' => 0];
+        $links = $linksQuery->get();
+
+        foreach ($links as $link) {
+            $integration = $link->integration;
+            if (! $integration || ! $integration->is_active || ! $integration->trello_board_id) {
+                continue;
+            }
+
+            if (! $force && $link->last_synced_at && now()->diffInSeconds($link->last_synced_at) < 45) {
+                continue;
+            }
+
+            $applications = Application::query()
+                ->with('student')
+                ->where('opportunity_id', $link->opportunity_id)
+                ->where('company_status', 'approved')
+                ->where('supervisor_status', 'approved')
+                ->where('final_status', 'approved')
+                ->whereNull('training_completed_at')
+                ->get();
+
+            if ($applications->isEmpty()) {
+                continue;
+            }
+
+            $cards = collect($this->trello->getBoardCards((string) $integration->trello_board_id, $integration))
+                ->filter(fn (array $card) => (string) ($card['idList'] ?? '') === (string) $link->trello_list_id)
+                ->values();
+
+            foreach ($cards as $card) {
+                $cardId = (string) ($card['id'] ?? '');
+                if ($cardId === '') {
+                    $totals['skipped']++;
+                    continue;
+                }
+
+                $existingTasks = Task::query()
+                    ->where('training_id', (int) $link->opportunity_id)
+                    ->where('trello_card_id', $cardId)
+                    ->get();
+
+                if ($existingTasks->isEmpty()) {
+                    foreach ($applications as $application) {
+                        $task = Task::query()->create([
+                            'application_id' => $application->id,
+                            'training_id' => (int) $link->opportunity_id,
+                            'company_user_id' => (int) $integration->company_user_id,
+                            'trello_integration_id' => (int) $integration->id,
+                            'created_by' => (int) $integration->company_user_id,
+                            'trello_card_id' => $cardId,
+                            'trello_list_id' => (string) ($card['idList'] ?? $link->trello_list_id),
+                            'source' => 'trello',
+                            'trello_last_synced_at' => now(),
+                            'title' => trim((string) ($card['name'] ?? 'Task')),
+                            'description' => (string) ($card['desc'] ?? ''),
+                            'details' => (string) ($card['desc'] ?? ''),
+                            'status' => ((bool) ($card['dueComplete'] ?? false) || (bool) ($card['closed'] ?? false)) ? 'done' : 'todo',
+                            'assigned_user' => $application->student?->name,
+                            'order' => ((int) Task::query()
+                                ->where('application_id', $application->id)
+                                ->where('status', 'todo')
+                                ->max('order')) + 1,
+                        ]);
+
+                        if ($application->student_id) {
+                            $task->assignedStudents()->syncWithoutDetaching([(int) $application->student_id]);
+                            TaskUser::query()
+                                ->where('task_id', $task->id)
+                                ->where('student_id', (int) $application->student_id)
+                                ->update(['status' => 'pending']);
+                        }
+                    }
+
+                    $totals['created']++;
+                } else {
+                    foreach ($existingTasks as $task) {
+                        $task->update([
+                            'title' => trim((string) ($card['name'] ?? $task->title)),
+                            'description' => (string) ($card['desc'] ?? ''),
+                            'details' => (string) ($card['desc'] ?? ''),
+                            'trello_list_id' => (string) ($card['idList'] ?? $task->trello_list_id),
+                            'status' => ((bool) ($card['dueComplete'] ?? false) || (bool) ($card['closed'] ?? false)) ? 'done' : 'todo',
+                            'trello_last_synced_at' => now(),
+                        ]);
+                    }
+
+                    $totals['updated']++;
+                }
+            }
+
+            $link->update(['last_synced_at' => now()]);
+        }
+
+        return $totals;
     }
 
     private function ensureTrainingOpen(Application $application): void
@@ -660,9 +997,11 @@ class TrainingTaskController extends Controller
 
         $task = Task::create([
             'application_id' => $application->id,
+            'training_id' => (int) $application->opportunity_id,
             'company_user_id' => (int) optional($application->opportunity)->company_user_id,
             'created_by' => $request->user()->id,
             'title' => trim($validated['title']),
+            'description' => $validated['details'] ?: null,
             'details' => $validated['details'] ?: null,
             'due_date' => $validated['due_date'] ?: null,
             'label' => $validated['label'] ?: null,
@@ -826,3 +1165,6 @@ class TrainingTaskController extends Controller
         return back()->with('success', 'تم حفظ التقييم بنجاح.');
     }
 }
+
+
+

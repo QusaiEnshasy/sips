@@ -312,6 +312,38 @@
                   <i class="bi bi-hourglass-split"></i> {{ t('loading_lists') }}
                 </div>
               </div>
+
+              <div class="mb-4">
+                <label class="form-label fw-bold">نمط توزيع المهام على الطلاب</label>
+                <select class="form-select" v-model="assignmentMode">
+                  <option value="marker_required">حسب تحديد الطالب داخل الكرت فقط</option>
+                  <option value="all">كل الطلاب المقبولين بهذا التدريب</option>
+                  <option value="selected">طلاب محددين فقط</option>
+                </select>
+                <div class="small text-muted mt-1">
+                  هذا الخيار يحدد من سيرى الكروت الجديدة إذا لم تضف `student:` داخل الكرت.
+                </div>
+              </div>
+
+              <div v-if="assignmentMode === 'selected'" class="mb-4">
+                <label class="form-label fw-bold">اختر الطلاب المستهدفين</label>
+                <div v-if="isLoadingInternshipStudents" class="small text-muted mb-2">
+                  <i class="bi bi-hourglass-split"></i> جاري تحميل الطلاب...
+                </div>
+                <div v-else-if="internshipStudents.length === 0" class="small text-danger mb-2">
+                  لا يوجد طلاب مقبولين حاليًا ضمن هذا التدريب.
+                </div>
+                <div v-else class="students-picker">
+                  <label v-for="student in internshipStudents" :key="student.id" class="student-chip">
+                    <input
+                      type="checkbox"
+                      :value="student.id"
+                      v-model="selectedTargetStudentIds"
+                    />
+                    <span>{{ student.name }} - {{ student.email }}</span>
+                  </label>
+                </div>
+              </div>
               
               <div class="info-box mb-4">
                 <i class="bi bi-info-circle"></i>
@@ -337,7 +369,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { companyAPI } from '@/services/api/company'
 import AOS from 'aos'
@@ -368,6 +400,10 @@ const selectedBoard = ref(null)
 const selectedBoardId = ref('')
 const selectedInternshipId = ref('')
 const selectedListId = ref('')
+const assignmentMode = ref('marker_required')
+const internshipStudents = ref([])
+const selectedTargetStudentIds = ref([])
+const isLoadingInternshipStudents = ref(false)
 
 // Computed
 const connectionStatusIcon = computed(() => {
@@ -540,6 +576,9 @@ const openConnectModal = async (board) => {
   selectedBoardId.value = board.id
   selectedInternshipId.value = ''
   selectedListId.value = ''
+  assignmentMode.value = 'marker_required'
+  internshipStudents.value = []
+  selectedTargetStudentIds.value = []
   showConnectModal.value = true
   await loadLists(board.id)
 }
@@ -561,6 +600,11 @@ const connectInternship = async () => {
     alert(t('fill_all_fields'))
     return
   }
+
+  if (assignmentMode.value === 'selected' && selectedTargetStudentIds.value.length === 0) {
+    alert('اختر طالبًا واحدًا على الأقل عند استخدام نمط طلاب محددين.')
+    return
+  }
   
   isConnecting.value = true
   try {
@@ -568,7 +612,9 @@ const connectInternship = async () => {
       board_id: selectedBoardId.value,
       list_id: selectedListId.value,
       list_name: lists.value.find((l) => l.id === selectedListId.value)?.name || null,
-      board_name: selectedBoard.value?.name
+      board_name: selectedBoard.value?.name,
+      assignment_mode: assignmentMode.value,
+      target_student_ids: assignmentMode.value === 'selected' ? selectedTargetStudentIds.value : []
     })
     alert(t('connected_successfully'))
     closeConnectModal()
@@ -639,7 +685,33 @@ const closeConnectModal = () => {
   selectedBoardId.value = ''
   selectedInternshipId.value = ''
   selectedListId.value = ''
+  assignmentMode.value = 'marker_required'
+  internshipStudents.value = []
+  selectedTargetStudentIds.value = []
   lists.value = []
+}
+
+const loadInternshipStudents = async (internshipId) => {
+  if (!internshipId) {
+    internshipStudents.value = []
+    selectedTargetStudentIds.value = []
+    return
+  }
+
+  isLoadingInternshipStudents.value = true
+  try {
+    const response = await companyAPI.getInternshipStudents(internshipId)
+    internshipStudents.value = response.data.data || []
+    selectedTargetStudentIds.value = selectedTargetStudentIds.value
+      .map((id) => Number(id))
+      .filter((id) => internshipStudents.value.some((student) => Number(student.id) === id))
+  } catch (error) {
+    internshipStudents.value = []
+    selectedTargetStudentIds.value = []
+    console.error('Failed to load internship students:', error)
+  } finally {
+    isLoadingInternshipStudents.value = false
+  }
 }
 
 onMounted(() => {
@@ -649,6 +721,10 @@ onMounted(() => {
   loadIntegrations()
   loadSyncLogs()
   loadInternships()
+})
+
+watch(selectedInternshipId, (internshipId) => {
+  loadInternshipStudents(internshipId)
 })
 </script>
 
@@ -1056,6 +1132,27 @@ onMounted(() => {
   border-radius: 10px;
   padding: 10px 12px;
   color: var(--text-dark);
+}
+
+.students-picker {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.student-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
 }
 
 @media (max-width: 768px) {

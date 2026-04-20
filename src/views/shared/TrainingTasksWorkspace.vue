@@ -24,26 +24,78 @@
     <div v-if="error" class="alert-box">{{ error }}</div>
     <div v-if="success" class="success-box">{{ success }}</div>
 
-    <section v-if="role === 'company'" class="create-panel">
+        <section v-if="role === 'company' || role === 'supervisor'" class="create-panel">
       <div class="section-heading">
         <div>
-          <h2>إنشاء المهام يتم من Trello الحقيقي</h2>
-          <p>الشركة لا تنشئ مهام الطلاب من الموقع. افتح Trello، أنشئ الكروت هناك، ثم ارجع واضغط مزامنة من صفحة تكامل Trello.</p>
+          <h2>Create Task From Laravel (Company/Supervisor)</h2>
+          <p>Select training + students from your system, then a Trello card is created automatically.</p>
         </div>
-        <router-link class="primary-action link-action" to="/company/trello-settings">
-          فتح تكامل Trello
-        </router-link>
+        <div class="d-flex gap-2">
+          <button class="secondary-action" type="button" @click="syncNow" :disabled="loading">
+            Sync From Trello
+          </button>
+          <router-link v-if="role === 'company'" class="primary-action link-action" to="/company/trello-settings">
+            Trello Settings
+          </router-link>
+        </div>
       </div>
 
-      <div class="students-box">
-        <div class="students-toolbar">
-          <strong>شروط ظهور كرت Trello للطالب</strong>
+      <form class="task-form" @submit.prevent="createTask">
+        <label>
+          Title
+          <input v-model.trim="taskForm.title" required />
+        </label>
+
+        <label>
+          Description
+          <textarea v-model.trim="taskForm.description" rows="3"></textarea>
+        </label>
+
+        <div class="form-grid">
+          <label>
+            Training
+            <select v-model="taskForm.training_id" required>
+              <option value="">Select training</option>
+              <option v-for="training in trainingOptions" :key="training.id" :value="training.id">
+                {{ training.program_title }}
+              </option>
+            </select>
+          </label>
+
+          <label>
+            Due date
+            <input type="date" v-model="taskForm.due_date" />
+          </label>
+
+          <label>
+            Label
+            <select v-model="taskForm.label">
+              <option value="">None</option>
+              <option value="red">Red</option>
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+            </select>
+          </label>
         </div>
-        <div class="rule-row">الكرت لازم يكون داخل القائمة المرتبطة بالبرنامج في صفحة تكامل Trello.</div>
-        <div class="rule-row">اكتب داخل عنوان أو وصف الكرت: <b>student: email</b> أو <b>student_id: الرقم الجامعي</b>.</div>
-        <div class="rule-row">الكرت بدون طالب محدد لن تتم مزامنته، حتى لا يظهر لكل الطلاب بالغلط.</div>
-        <div class="rule-row">بعد تسليم الطالب من الموقع، سيضاف تعليق تلقائي على كرت Trello الحقيقي مع الحل وروابط الملفات.</div>
-      </div>
+
+        <div class="students-box">
+          <div class="students-toolbar">
+            <strong>Assign Students</strong>
+            <button type="button" @click="toggleAllStudents">{{ allStudentsSelected ? 'Unselect All' : 'Select All' }}</button>
+          </div>
+
+          <div v-if="filteredTrainingStudents.length === 0" class="empty-state small">No students found for selected training.</div>
+          <label v-for="application in filteredTrainingStudents" :key="application.id" class="student-row">
+            <input type="checkbox" :value="application.student_id" v-model="selectedStudentIds" />
+            <div>
+              <strong>{{ application.student_name }}</strong>
+              <small>{{ application.student_email }}</small>
+            </div>
+          </label>
+        </div>
+
+        <button class="primary-action" :disabled="savingTask">Create Task + Trello Card</button>
+      </form>
     </section>
 
     <section class="tasks-panel">
@@ -132,16 +184,43 @@ const success = ref('')
 const role = ref('')
 const applications = ref([])
 const tasks = ref([])
-const selectedApplicationIds = ref([])
+const selectedStudentIds = ref([])
 const studentSubmissions = ref({})
 const taskFiles = ref({})
 const grades = ref({})
 
 const taskForm = ref({
   title: '',
-  details: '',
+  description: '',
+  training_id: '',
   due_date: '',
   label: ''
+})
+
+const trainingOptions = computed(() => {
+  const map = new Map()
+  for (const app of applications.value) {
+    if (!map.has(app.program_title)) {
+      map.set(app.program_title, {
+        id: app.id ? Number(app.id) : null,
+        program_title: app.program_title,
+        training_id: app.training_id || app.opportunity_id || null
+      })
+    }
+  }
+  return applications.value
+    .filter((app) => app.program_title)
+    .map((app) => ({
+      id: Number(app.training_id || app.opportunity_id || app.id),
+      program_title: app.program_title
+    }))
+    .filter((item, index, arr) => arr.findIndex((x) => x.id === item.id) === index)
+})
+
+const filteredTrainingStudents = computed(() => {
+  const selectedTrainingId = Number(taskForm.value.training_id || 0)
+  if (!selectedTrainingId) return []
+  return applications.value.filter((app) => Number(app.training_id || app.opportunity_id || app.id) === selectedTrainingId)
 })
 
 const statCards = computed(() => [
@@ -152,7 +231,7 @@ const statCards = computed(() => [
 ])
 
 const allStudentsSelected = computed(() => (
-  applications.value.length > 0 && selectedApplicationIds.value.length === applications.value.length
+  filteredTrainingStudents.value.length > 0 && selectedStudentIds.value.length === filteredTrainingStudents.value.length
 ))
 
 const loadWorkspace = async () => {
@@ -175,9 +254,9 @@ const loadWorkspace = async () => {
 }
 
 const toggleAllStudents = () => {
-  selectedApplicationIds.value = allStudentsSelected.value
+  selectedStudentIds.value = allStudentsSelected.value
     ? []
-    : applications.value.map((application) => application.id)
+    : filteredTrainingStudents.value.map((application) => application.student_id)
 }
 
 const createTask = async () => {
@@ -187,16 +266,28 @@ const createTask = async () => {
   try {
     await trainingTasksAPI.createTask({
       ...taskForm.value,
-      application_ids: selectedApplicationIds.value
+      student_ids: selectedStudentIds.value
     })
     success.value = 'تم إنشاء المهمة بنجاح، وكل طالب أخذ نسخة خاصة للتسليم والتقييم.'
-    taskForm.value = { title: '', details: '', due_date: '', label: '' }
-    selectedApplicationIds.value = []
+    taskForm.value = { title: '', description: '', training_id: '', due_date: '', label: '' }
+    selectedStudentIds.value = []
     await loadWorkspace()
   } catch (e) {
     error.value = e?.response?.data?.message || 'تعذر إنشاء المهمة.'
   } finally {
     savingTask.value = false
+  }
+}
+
+const syncNow = async () => {
+  loading.value = true
+  try {
+    await trainingTasksAPI.syncTasks()
+    await loadWorkspace()
+  } catch (e) {
+    error.value = e?.response?.data?.message || 'Sync failed.'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -621,3 +712,5 @@ textarea {
   }
 }
 </style>
+
+

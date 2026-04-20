@@ -5,6 +5,7 @@ namespace App\Http\Controllers\company;
 use App\Http\Controllers\Controller;
 use App\Models\InternshipOpportunity;
 use App\Models\Task;
+use App\Models\Application;
 use App\Models\TrelloIntegration;
 use App\Models\TrelloInternshipLink;
 use App\Models\TrelloSyncLog;
@@ -391,6 +392,28 @@ class CompanyTrelloController extends Controller
         }
 
         $payload = $integration->internshipLinks->map(function (TrelloInternshipLink $link) use ($integration, $boardUrl) {
+            $targetStudentIds = collect($link->target_student_ids ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->values();
+
+            $targetStudents = Application::query()
+                ->with('student:id,name,email,university_id')
+                ->where('opportunity_id', $link->opportunity_id)
+                ->where('company_status', 'approved')
+                ->where('supervisor_status', 'approved')
+                ->where('final_status', 'approved')
+                ->whereNull('training_completed_at')
+                ->whereIn('student_id', $targetStudentIds)
+                ->get()
+                ->map(fn (Application $application) => [
+                    'id' => (int) $application->student_id,
+                    'name' => $application->student?->name,
+                    'email' => $application->student?->email,
+                    'university_id' => $application->student?->university_id,
+                ])
+                ->values();
+
             return [
                 'id' => $link->id,
                 'internship_id' => $link->opportunity_id,
@@ -402,6 +425,9 @@ class CompanyTrelloController extends Controller
                 'list_name' => $link->trello_list_name,
                 'last_sync' => optional($link->last_synced_at)->toISOString(),
                 'sync_status' => $link->sync_status,
+                'assignment_mode' => $link->assignment_mode ?: 'marker_required',
+                'target_student_ids' => $targetStudentIds,
+                'target_students' => $targetStudents,
                 'sync_url' => route('company.trello.sync', ['internshipId' => $link->opportunity_id]),
                 'latest_log' => $link->syncLogs()->latest()->first()?->only([
                     'id',
@@ -428,6 +454,9 @@ class CompanyTrelloController extends Controller
             'board_name' => ['nullable', 'string', 'max:255'],
             'list_id' => ['required', 'string', 'max:255'],
             'list_name' => ['nullable', 'string', 'max:255'],
+            'assignment_mode' => ['nullable', 'in:marker_required,all,selected'],
+            'target_student_ids' => ['nullable', 'array'],
+            'target_student_ids.*' => ['integer'],
         ]);
 
         $integration = TrelloIntegration::query()->where('company_user_id', $companyId)->firstOrFail();
@@ -441,6 +470,32 @@ class CompanyTrelloController extends Controller
             'is_active' => true,
         ]);
 
+        $eligibleStudentIds = Application::query()
+            ->where('opportunity_id', $opportunity->id)
+            ->where('company_status', 'approved')
+            ->where('supervisor_status', 'approved')
+            ->where('final_status', 'approved')
+            ->whereNull('training_completed_at')
+            ->pluck('student_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->values();
+
+        $assignmentMode = (string) ($validated['assignment_mode'] ?? 'marker_required');
+        $targetStudentIds = collect($validated['target_student_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $eligibleStudentIds->contains($id))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($assignmentMode === 'selected' && empty($targetStudentIds)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please choose at least one approved student when using selected mode.',
+            ], 422);
+        }
+
         TrelloInternshipLink::query()->updateOrCreate(
             [
                 'trello_integration_id' => $integration->id,
@@ -449,6 +504,8 @@ class CompanyTrelloController extends Controller
             [
                 'trello_list_id' => $validated['list_id'],
                 'trello_list_name' => $validated['list_name'] ?? null,
+                'assignment_mode' => $assignmentMode,
+                'target_student_ids' => $assignmentMode === 'selected' ? $targetStudentIds : null,
                 'sync_status' => 'idle',
             ]
         );
@@ -480,6 +537,36 @@ class CompanyTrelloController extends Controller
             'status' => 'success',
             'message' => 'Trello sync completed.',
             'data' => $result,
+        ]);
+    }
+
+    public function internshipStudents(int $internshipId): JsonResponse
+    {
+        $companyId = $this->companyUserId();
+        $opportunity = InternshipOpportunity::query()
+            ->where('company_user_id', $companyId)
+            ->findOrFail($internshipId);
+
+        $students = Application::query()
+            ->with('student:id,name,email,university_id')
+            ->where('opportunity_id', $opportunity->id)
+            ->where('company_status', 'approved')
+            ->where('supervisor_status', 'approved')
+            ->where('final_status', 'approved')
+            ->whereNull('training_completed_at')
+            ->get()
+            ->map(fn (Application $application) => [
+                'id' => (int) $application->student_id,
+                'name' => $application->student?->name,
+                'email' => $application->student?->email,
+                'university_id' => $application->student?->university_id,
+            ])
+            ->filter(fn (array $student) => $student['id'] > 0)
+            ->values();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $students,
         ]);
     }
 

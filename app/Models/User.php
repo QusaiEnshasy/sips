@@ -89,6 +89,7 @@ class User extends Authenticatable
     public function assignedTasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class, 'task_assignments', 'student_id', 'task_id')
+            ->withPivot('status')
             ->withTimestamps();
     }
 }

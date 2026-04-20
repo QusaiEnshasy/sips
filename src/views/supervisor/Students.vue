@@ -126,6 +126,7 @@
             <tr>
               <th>{{ t('student') }}</th>
               <th>{{ t('program') }}</th>
+              <th>حالة الشركة</th>
               <th>{{ t('actions') }}</th>
             </tr>
           </thead>
@@ -136,6 +137,11 @@
                 <small class="text-muted">{{ app.student_email }}</small>
               </td>
               <td>{{ app.program_title || '-' }}</td>
+              <td>
+                <span class="badge" :class="companyStatusBadge(app.company_status)">
+                  {{ companyStatusText(app.company_status) }}
+                </span>
+              </td>
               <td class="d-flex gap-2">
                 <button class="btn btn-sm btn-success" @click="approveApplication(app.id)">{{ t('approved') }}</button>
                 <button class="btn btn-sm btn-danger" @click="rejectApplication(app.id)">{{ t('rejected') }}</button>
@@ -426,6 +432,18 @@ const jisrStatusBadge = (status) => ({
   accepted: 'bg-success',
   rejected: 'bg-danger'
 }[status] || 'bg-secondary')
+
+const companyStatusText = (status) => ({
+  approved: 'مقبول',
+  rejected: 'مرفوض',
+  pending: 'بانتظار الشركة'
+}[status] || 'بانتظار الشركة')
+
+const companyStatusBadge = (status) => ({
+  approved: 'bg-success',
+  rejected: 'bg-danger',
+  pending: 'bg-warning text-dark'
+}[status] || 'bg-warning text-dark')
 
 const openRejectModal = (type, id, label) => {
   rejectModal.value = {

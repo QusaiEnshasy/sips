@@ -93,13 +93,13 @@ class TrelloTaskSyncService
 
         DB::transaction(function () use ($applications, $cards, $lists, $integration, $link, &$counts, &$assignmentDetails) {
             foreach ($cards as $card) {
-                $targetApplications = $this->resolveTargetApplications($card, $applications);
+                $targetApplications = $this->resolveTargetApplications($card, $applications, $link);
 
                 if ($targetApplications->isEmpty()) {
                     $counts['skipped']++;
                     $assignmentDetails[] = [
                         'card' => $card['name'] ?? $card['id'] ?? null,
-                        'reason' => 'missing or invalid student marker',
+                        'reason' => 'no matching students for this card/link settings',
                     ];
                     continue;
                 }
@@ -167,12 +167,16 @@ class TrelloTaskSyncService
         ]);
     }
 
-    private function resolveTargetApplications(array $card, Collection $applications): Collection
+    private function resolveTargetApplications(array $card, Collection $applications, ?TrelloInternshipLink $link = null): Collection
     {
         $markers = $this->extractStudentMarkers($card);
 
+        if ($markers->contains('__all__')) {
+            return $applications->values();
+        }
+
         if ($markers->isEmpty()) {
-            return collect();
+            return $this->resolveDefaultApplicationsFromLink($applications, $link);
         }
 
         return $applications->filter(function (Application $application) use ($markers) {
@@ -193,6 +197,31 @@ class TrelloTaskSyncService
         })->values();
     }
 
+    private function resolveDefaultApplicationsFromLink(Collection $applications, ?TrelloInternshipLink $link): Collection
+    {
+        $mode = (string) ($link?->assignment_mode ?? 'marker_required');
+        if ($mode === 'all') {
+            return $applications->values();
+        }
+
+        if ($mode === 'selected') {
+            $targetIds = collect($link?->target_student_ids ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->values();
+
+            if ($targetIds->isEmpty()) {
+                return collect();
+            }
+
+            return $applications
+                ->filter(fn (Application $application) => $targetIds->contains((int) $application->student_id))
+                ->values();
+        }
+
+        return collect();
+    }
+
     private function extractStudentMarkers(array $card): Collection
     {
         $text = Str::lower(trim(((string) ($card['name'] ?? '')) . "\n" . ((string) ($card['desc'] ?? ''))));
@@ -202,9 +231,13 @@ class TrelloTaskSyncService
 
         $markers = collect();
 
+        if (preg_match('/(?:for|audience|students?)\s*[:=]\s*(all|everyone|\*|جميع|الكل)/iu', $text) === 1) {
+            $markers->push('__all__');
+        }
+
         preg_match_all('/(?:student|students|student_id|university_id|email)\s*[:=]\s*([^\n\r]+)/iu', $text, $matches);
         foreach ($matches[1] ?? [] as $rawValue) {
-            collect(preg_split('/[,،;|\s]+/u', (string) $rawValue))
+            collect(preg_split('/[,\x{060C};|\s]+/u', (string) $rawValue))
                 ->map(fn ($value) => trim($value, " \t\n\r\0\x0B[](){}<>"))
                 ->filter()
                 ->each(fn ($value) => $markers->push($value));
@@ -264,3 +297,4 @@ class TrelloTaskSyncService
         return 'todo';
     }
 }
+

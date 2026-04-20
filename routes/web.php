@@ -98,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/company/trello/boards/{boardId}/lists', [CompanyTrelloController::class, 'lists'])->name('company.trello.lists');
     Route::get('/company/trello/integrations', [CompanyTrelloController::class, 'integrations'])->name('company.trello.integrations');
     Route::get('/company/trello/sync-logs', [CompanyTrelloController::class, 'syncLogs'])->name('company.trello.sync-logs');
+    Route::get('/company/trello/internships/{internshipId}/students', [CompanyTrelloController::class, 'internshipStudents'])->name('company.trello.internship-students');
     Route::post('/company/trello/internships/{internshipId}/connect', [CompanyTrelloController::class, 'connectBoard'])->name('company.trello.connect');
     Route::post('/company/trello/internships/{internshipId}/sync', [CompanyTrelloController::class, 'syncInternship'])->name('company.trello.sync');
     Route::delete('/company/trello/internships/{internshipId}/unlink', [CompanyTrelloController::class, 'unlinkInternship'])->name('company.trello.unlink');
@@ -162,6 +163,7 @@ Route::middleware('auth')->group(function () {
     // Training Tasks Workflow (Role-based + Trello sync)
     Route::get('/workspace/tasks', [TrainingTaskController::class, 'workspace'])->name('tasks.workspace');
     Route::post('/workspace/tasks', [TrainingTaskController::class, 'storeWorkspaceTask'])->name('tasks.workspace.store');
+    Route::post('/workspace/tasks/sync', [TrainingTaskController::class, 'syncWorkspaceTasks'])->name('tasks.workspace.sync');
     Route::post('/workspace/tasks/{task}/submit', [TrainingTaskController::class, 'submitWorkspaceTask'])->name('tasks.workspace.submit');
     Route::post('/workspace/tasks/{task}/grade', [TrainingTaskController::class, 'gradeWorkspaceTask'])->name('tasks.workspace.grade');
     Route::get('/admin/tasks/workspace', [TrainingTaskController::class, 'adminWorkspace'])->name('tasks.admin.workspace');
