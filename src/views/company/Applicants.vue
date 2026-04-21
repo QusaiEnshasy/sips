@@ -291,15 +291,12 @@ const changePage = (page) => {
   }
 }
 
-const viewApplicant = (applicant) => {
-  router.push(`/company/applicants/${applicant.id}`)
+const viewApplicant = () => {
+  router.push('/company/training-tasks')
 }
 
-const openBoard = (item) => {
-  const url = item.board_url
-  if (url) {
-    window.location.href = url
-  }
+const openBoard = () => {
+  router.push('/company/training-tasks')
 }
 
 const acceptApplicant = async (applicant) => {

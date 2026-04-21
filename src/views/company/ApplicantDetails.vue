@@ -368,9 +368,7 @@ const goBack = () => {
 }
 
 const openBoard = () => {
-  if (applicant.value?.board_url) {
-    window.location.href = applicant.value.board_url
-  }
+  router.push('/company/training-tasks')
 }
 
 const getStatusClass = (status) => {

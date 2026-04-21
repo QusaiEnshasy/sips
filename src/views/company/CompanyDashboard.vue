@@ -46,7 +46,6 @@
         </div>
       </div>
 
-<<<<<<< Updated upstream
       <div class="trello-hub mb-5" data-aos="fade-up">
         <div class="trello-hub-content">
           <div class="trello-mark">
@@ -64,23 +63,6 @@
           <i class="bi bi-plug me-2"></i>
           فتح تكامل Trello
         </button>
-=======
-      <!-- Trello Quick Access -->
-      <div class="trello-quick-card mb-4" data-aos="fade-up">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-          <div>
-            <h6 class="fw-bold mb-1">
-              <i class="bi bi-kanban me-2 text-primary"></i>
-              Trello Integration
-            </h6>
-            <p class="text-muted mb-0">اربط Trello الخاص بالشركة وحدث المهام للطلاب من مكان واحد.</p>
-          </div>
-          <button class="btn-accent-outline" @click="openTrelloSettings">
-            <i class="bi bi-sliders me-2"></i>
-            إعدادات Trello
-          </button>
-        </div>
->>>>>>> Stashed changes
       </div>
 
       <!-- Stats Cards -->
@@ -413,22 +395,16 @@ const viewProgram = (program) => {
   router.push(`/company/programs/${program.id}`)
 }
 
-const viewApplicant = (applicant) => {
-  router.push(`/company/applicants/${applicant.id}`)
+const viewApplicant = () => {
+  router.push('/company/training-tasks')
 }
 
-const openTrelloSettings = () => {
-  router.push('/company/trello-settings')
+const openBoard = () => {
+  router.push('/company/training-tasks')
 }
 
-const openBoard = (applicant) => {
-  if (applicant?.board_url) {
-    window.location.href = applicant.board_url
-  }
-}
-
-const reviewApplicant = (applicant) => {
-  router.push(`/company/applicants/${applicant.id}?review=true`)
+const reviewApplicant = () => {
+  router.push('/company/training-tasks')
 }
 
 onMounted(() => {
@@ -727,3 +703,4 @@ onMounted(() => {
   }
 }
 </style>
+

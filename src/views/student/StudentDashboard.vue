@@ -17,11 +17,7 @@
             {{ student.name }} <span v-if="student.student_id">| {{ student.student_id }}</span>
           </p>
         </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-success rounded-pill px-3" @click="testAlert">
-            <i class="bi bi-bell"></i> اختبار التنبيه
-          </button>
-          <router-link class="btn btn-primary rounded-pill px-4" to="/student/browse-programs">
+        <div class="d-flex gap-2"><router-link class="btn btn-primary rounded-pill px-4" to="/student/browse-programs">
             {{ t('browse_programs') }}
           </router-link>
         </div>
@@ -113,7 +109,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { studentAPI } from '@/services/api/student'
 import { useI18n } from '@/composables/useI18n'
-import { useAlerts } from '@/composables/useAlerts'
 
 const isLoading = ref(false)
 const { t } = useI18n()
@@ -188,3 +183,4 @@ onMounted(loadDashboard)
   padding: 12px;
 }
 </style>
+

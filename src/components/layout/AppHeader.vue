@@ -3,33 +3,16 @@
     <div class="container-fluid px-3 px-md-4 px-lg-5">
       <div class="d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-          <!-- زر فتح القائمة للموبايل -->
-          <button
-            class="menu-toggle d-md-none"
-            @click="$emit('toggle-sidebar')"
-            :aria-label="t('toggle_menu')"
-          >
+          <button class="menu-toggle d-md-none" @click="$emit('toggle-sidebar')" :aria-label="t('toggle_menu')">
             <i class="bi bi-list"></i>
           </button>
 
-          <!-- شعار الصفحة (يختلف حسب المسار) -->
-          <div class="d-flex align-items-center gap-2">
-            <router-link :to="dashboardPath" class="icon-box-link">
-              <div
-                class="icon-box"
-                :style="{ background: pageIcon.background }"
-              >
-                <i :class="pageIcon.icon"></i>
-              </div>
-            </router-link>
-            <div>
-              <h5 class="fw-bold mb-0" v-text="pageTitle"></h5>
-              <small class="text-muted" v-if="pageSubtitle" v-text="pageSubtitle"></small>
-            </div>
+          <div>
+            <h5 class="fw-bold mb-0" v-text="pageTitle"></h5>
+            <small class="text-muted" v-if="pageSubtitle" v-text="pageSubtitle"></small>
           </div>
         </div>
 
-        <!-- أدوات التحكم -->
         <div class="d-flex align-items-center gap-2 gap-sm-3">
           <div v-if="isSupervisor && supervisorCode" class="supervisor-code-badge">
             <i class="bi bi-key text-primary"></i>
@@ -39,40 +22,22 @@
               <i class="bi bi-copy"></i>
             </button>
           </div>
-          <!-- البحث (اختياري) -->
+
           <div v-if="showSearch" class="search-wrapper d-none d-lg-block">
             <i class="bi bi-search"></i>
-            <input
-              type="text"
-              class="search-input"
-              :placeholder="t('search')"
-              @input="$emit('search', $event.target.value)"
-            />
+            <input type="text" class="search-input" :placeholder="t('search')" @input="$emit('search', $event.target.value)" />
           </div>
 
-          <!-- الإشعارات -->
           <button class="btn-notification" @click="openNotifications" :aria-label="t('notifications')">
             <i class="bi bi-bell"></i>
-            <span v-if="unreadCount > 0" class="notification-badge">
-              {{ unreadCount > 99 ? '99+' : unreadCount }}
-            </span>
+            <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
           </button>
 
-          <!-- تبديل اللغة -->
           <LanguageSwitcher />
-
-          <!-- تبديل الثيم -->
           <ThemeToggle />
 
-          <!-- صورة المستخدم -->
           <router-link to="/profile" class="user-avatar">
-            <img
-              :src="userAvatar || 'https://ui-avatars.com/api/?name=User&background=7c3aed&color=fff'"
-              alt="Profile"
-              class="rounded-circle border"
-              width="40"
-              height="40"
-            />
+            <img :src="userAvatar || 'https://ui-avatars.com/api/?name=User&background=7c3aed&color=fff'" alt="Profile" class="rounded-circle border" width="40" height="40" />
           </router-link>
         </div>
       </div>
@@ -95,18 +60,9 @@ const router = useRouter()
 const authStore = useAuthStore()
 const notificationsStore = useNotificationsStore()
 
-// تعريف emits
-const emit = defineEmits(['toggle-sidebar', 'search'])
+defineEmits(['toggle-sidebar', 'search'])
+defineProps({ showSearch: { type: Boolean, default: false } })
 
-// تعريف خصائص المكون
-defineProps({
-  showSearch: {
-    type: Boolean,
-    default: false
-  }
-})
-
-// عنوان الصفحة حسب المسار
 const pageTitle = computed(() => {
   const titles = {
     '/admin/dashboard': t('admin_dashboard'),
@@ -127,36 +83,14 @@ const pageSubtitle = computed(() => {
   return subtitles[route.path] || ''
 })
 
-// أيقونة الصفحة
-const pageIcon = computed(() => {
-  const icons = {
-    '/admin/dashboard': { icon: 'bi bi-speedometer2', background: 'var(--accent)' },
-    '/supervisor/dashboard': { icon: 'bi bi-grid', background: 'var(--primary-purple)' },
-    '/student/dashboard': { icon: 'bi bi-mortarboard-fill', background: 'var(--accent)' },
-    '/company/dashboard': { icon: 'bi bi-building', background: '#10b981' }
-  }
-  return icons[route.path] || { icon: 'bi bi-house', background: 'var(--accent)' }
-})
-
-// مسار اللوحة المناسبة حسب الدور
-const dashboardPath = computed(() => {
-  const paths = {
-    'admin': '/admin/dashboard',
-    'supervisor': '/supervisor/dashboard',
-    'student': '/student/dashboard',
-    'company': '/company/dashboard'
-  }
-  return paths[authStore.userType] || '/login'
-})
-
 const isSupervisor = computed(() => {
   const role = authStore.user?.role || authStore.user?.type || authStore.userType
   return role === 'supervisor'
 })
 
 const supervisorCode = computed(() => authStore.user?.supervisor_code || '')
-
 const userAvatar = computed(() => authStore.user?.avatar || authStore.user?.profile_photo_url || '')
+const unreadCount = computed(() => notificationsStore.unreadCount || 0)
 
 const copySupervisorCode = async () => {
   if (!supervisorCode.value) return
@@ -173,13 +107,8 @@ const openNotifications = async () => {
   router.push('/notifications')
 }
 
-onMounted(() => {
-  notificationsStore.startPolling()
-})
-
-onUnmounted(() => {
-  notificationsStore.stopPolling()
-})
+onMounted(() => notificationsStore.startPolling())
+onUnmounted(() => notificationsStore.stopPolling())
 </script>
 
 <style scoped>
@@ -208,46 +137,11 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.icon-box-link {
-  text-decoration: none;
-  color: inherit;
-}
-
-.icon-box-link:hover .icon-box {
-  transform: scale(1.05);
-  transition: transform 0.2s ease;
-}
-
-.search-wrapper {
-  position: relative;
-  width: 300px;
-}
-
-.search-wrapper i {
-  position: absolute;
-  left: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-}
-
-.search-input {
-  width: 100%;
-  padding: 10px 15px 10px 45px;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--input-bg);
-  color: var(--text-dark);
-}
-
-[dir="rtl"] .search-wrapper i {
-  left: auto;
-  right: 15px;
-}
-
-[dir="rtl"] .search-input {
-  padding: 10px 45px 10px 15px;
-}
+.search-wrapper { position: relative; width: 300px; }
+.search-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+.search-input { width: 100%; padding: 10px 15px 10px 45px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--input-bg); color: var(--text-dark); }
+[dir="rtl"] .search-wrapper i { left: auto; right: 15px; }
+[dir="rtl"] .search-input { padding: 10px 45px 10px 15px; }
 
 .btn-notification {
   width: 40px;
@@ -278,74 +172,14 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-.notification-dropdown {
-  width: 350px;
-  padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  background: var(--card-bg);
-}
-
-.supervisor-code-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 999px;
-  padding: 6px 10px;
-}
-
-.copy-code-btn {
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--border-color);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.copy-code-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.notification-header {
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.notification-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.user-avatar {
-  display: block;
-  line-height: 0;
-}
+.supervisor-code-badge { display: flex; align-items: center; gap: 8px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 999px; padding: 6px 10px; }
+.copy-code-btn { width: 28px; height: 28px; border: 1px solid var(--border-color); border-radius: 50%; background: transparent; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.copy-code-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.user-avatar { display: block; line-height: 0; }
 
 @media (max-width: 768px) {
-  .page-header {
-    padding: 10px 0;
-  }
-
-  .search-wrapper {
-    display: none;
-  }
-
-  .supervisor-code-badge {
-    max-width: 180px;
-    overflow: hidden;
-    white-space: nowrap;
-  }
+  .page-header { padding: 10px 0; }
+  .search-wrapper { display: none; }
+  .supervisor-code-badge { max-width: 180px; overflow: hidden; white-space: nowrap; }
 }
 </style>

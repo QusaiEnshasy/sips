@@ -27,35 +27,35 @@
         <section v-if="role === 'company' || role === 'supervisor'" class="create-panel">
       <div class="section-heading">
         <div>
-          <h2>Create Task From Laravel (Company/Supervisor)</h2>
-          <p>Select training + students from your system, then a Trello card is created automatically.</p>
+          <h2>إنشاء مهمة من النظام (شركة/مشرف)</h2>
+          <p>حدد التدريب والطلاب من داخل الموقع، وسيتم إنشاء كرت Trello تلقائيا.</p>
         </div>
         <div class="d-flex gap-2">
           <button class="secondary-action" type="button" @click="syncNow" :disabled="loading">
-            Sync From Trello
+            مزامنة من Trello
           </button>
           <router-link v-if="role === 'company'" class="primary-action link-action" to="/company/trello-settings">
-            Trello Settings
+            إعدادات Trello
           </router-link>
         </div>
       </div>
 
       <form class="task-form" @submit.prevent="createTask">
         <label>
-          Title
+          عنوان المهمة
           <input v-model.trim="taskForm.title" required />
         </label>
 
         <label>
-          Description
+          وصف المهمة
           <textarea v-model.trim="taskForm.description" rows="3"></textarea>
         </label>
 
         <div class="form-grid">
           <label>
-            Training
+            التدريب
             <select v-model="taskForm.training_id" required>
-              <option value="">Select training</option>
+              <option value="">اختر تدريب</option>
               <option v-for="training in trainingOptions" :key="training.id" :value="training.id">
                 {{ training.program_title }}
               </option>
@@ -63,28 +63,28 @@
           </label>
 
           <label>
-            Due date
+            موعد التسليم
             <input type="date" v-model="taskForm.due_date" />
           </label>
 
           <label>
-            Label
+            الوسم
             <select v-model="taskForm.label">
-              <option value="">None</option>
-              <option value="red">Red</option>
-              <option value="green">Green</option>
-              <option value="blue">Blue</option>
+              <option value="">بدون</option>
+              <option value="red">أحمر</option>
+              <option value="green">أخضر</option>
+              <option value="blue">أزرق</option>
             </select>
           </label>
         </div>
 
         <div class="students-box">
           <div class="students-toolbar">
-            <strong>Assign Students</strong>
-            <button type="button" @click="toggleAllStudents">{{ allStudentsSelected ? 'Unselect All' : 'Select All' }}</button>
+            <strong>تعيين الطلاب</strong>
+            <button type="button" @click="toggleAllStudents">{{ allStudentsSelected ? 'إلغاء تحديد الكل' : 'تحديد الكل' }}</button>
           </div>
 
-          <div v-if="filteredTrainingStudents.length === 0" class="empty-state small">No students found for selected training.</div>
+          <div v-if="filteredTrainingStudents.length === 0" class="empty-state small">لا يوجد طلاب ضمن التدريب المحدد.</div>
           <label v-for="application in filteredTrainingStudents" :key="application.id" class="student-row">
             <input type="checkbox" :value="application.student_id" v-model="selectedStudentIds" />
             <div>
@@ -94,7 +94,7 @@
           </label>
         </div>
 
-        <button class="primary-action" :disabled="savingTask">Create Task + Trello Card</button>
+        <button class="primary-action" :disabled="savingTask">إنشاء المهمة + كرت Trello</button>
       </form>
     </section>
 
