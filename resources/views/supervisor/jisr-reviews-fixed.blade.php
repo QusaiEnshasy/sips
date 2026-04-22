@@ -655,6 +655,7 @@
                             <div class="current-review">{{ data_get($submission, 'feedback') ?: 'لا توجد ملاحظات محفوظة بعد.' }}</div>
 
                             <div class="review-actions">
+                                @if(data_get($submission, 'status') !== 'accepted')
                                 <details class="review-toggle accept">
                                     <summary>اعتماد المهمة</summary>
                                     <form method="POST" action="{{ route('supervisor.jisr-reviews.review', ['id' => data_get($submission, 'id')]) }}" class="review-form">
@@ -671,6 +672,7 @@
                                         <button type="submit" class="btn btn-success w-100">حفظ الاعتماد</button>
                                     </form>
                                 </details>
+                                @endif
 
                                 <details class="review-toggle reject">
                                     <summary>إرجاع المهمة</summary>

@@ -215,6 +215,7 @@
                         <div class="jisr-answer-box">{{ $submission['feedback'] ?: 'لا توجد ملاحظات محفوظة بعد.' }}</div>
                     </div>
 
+                    @if($submission['status'] !== 'accepted')
                     <form method="POST" action="{{ route('supervisor.jisr-reviews.review', ['id' => $submission['id']]) }}" class="jisr-form-card mb-3">
                         @csrf
                         <input type="hidden" name="status" value="accepted">
@@ -231,6 +232,7 @@
                             <i class="bi bi-check-circle me-1"></i> اعتماد الحل
                         </button>
                     </form>
+                    @endif
 
                     <form method="POST" action="{{ route('supervisor.jisr-reviews.review', ['id' => $submission['id']]) }}" class="jisr-form-card">
                         @csrf

@@ -1287,10 +1287,6 @@ class TrainingTaskController extends Controller
         $trainingEnded = $this->isTrainingEnded($application);
         $trainingEndDate = $this->getTrainingEndDate($application);
 
-        if ($application->training_completed_at && $request->user()->role === 'student') {
-            return redirect()->route('training.complete', $application->id);
-        }
-
         $tasks = Task::with([
             'creator:id,name,role',
             'comments.user:id,name,role',

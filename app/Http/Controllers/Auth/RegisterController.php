@@ -63,6 +63,15 @@ class RegisterController extends Controller
                 ->first();
 
             if (!$supervisor) {
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json([
+                        'message' => 'كود المشرف غير صحيح',
+                        'errors' => [
+                            'supervisor_code' => ['كود المشرف غير صحيح'],
+                        ],
+                    ], 422);
+                }
+
                 return back()->withErrors([
                     'supervisor_code' => 'كود المشرف غير صحيح'
                 ])->withInput();
@@ -90,6 +99,16 @@ class RegisterController extends Controller
             $request->session()->regenerate();
             $this->logRegisterNotification($user->id);
 
+            if ($request->expectsJson() || $request->ajax()) {
+                $request->session()->flash('success', 'تم إنشاء حساب الأدمن وتسجيل الدخول بنجاح');
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'تم إنشاء حساب الأدمن وتسجيل الدخول بنجاح',
+                    'redirect' => route('admin.dashboard'),
+                ]);
+            }
+
             return redirect()->route('admin.dashboard')
                 ->with('success', 'تم إنشاء حساب الأدمن وتسجيل الدخول بنجاح');
         }
@@ -97,6 +116,20 @@ class RegisterController extends Controller
         $successMessage = $user->role === 'student'
             ? 'تم إنشاء الحساب بنجاح، بانتظار موافقة المشرف'
             : 'تم إنشاء الحساب بنجاح، بانتظار موافقة الأدمن';
+
+        $successMessage = $user->role === 'student'
+            ? 'تم إنشاء حسابك بنجاح، والآن قيد انتظار قبول المشرف.'
+            : 'تم إنشاء الحساب بنجاح، والآن قيد انتظار قبول الأدمن.';
+
+        if ($request->expectsJson() || $request->ajax()) {
+            $request->session()->flash('success', $successMessage);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => $successMessage,
+                'redirect' => route('login'),
+            ]);
+        }
 
         return redirect()->route('login')
             ->with('success', $successMessage);

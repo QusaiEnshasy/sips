@@ -1,8 +1,14 @@
 <template>
   <div class="students-page">
-    <div class="mb-4">
-      <h2 class="fw-bold mb-1">{{ t('students') }}</h2>
-      <p class="text-muted mb-0">{{ t('manage_pending_approved_students') }}</p>
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">{{ t('students') }}</h2>
+        <p class="text-muted mb-0">{{ t('manage_pending_approved_students') }}</p>
+      </div>
+      <button class="btn btn-primary rounded-pill px-4" @click="openCreateStudentModal">
+        <i class="bi bi-person-plus me-2"></i>
+        {{ t('add_student') }}
+      </button>
     </div>
 
     <div class="jisr-entry-card mb-4 jisr-entry-card-strong">
@@ -68,7 +74,7 @@
                 </div>
               </td>
               <td class="d-flex gap-2 flex-wrap">
-                <button class="btn btn-sm btn-success" @click="openJisrReviewModal(submission, 'accepted')">اعتماد</button>
+                <button v-if="submission.status !== 'accepted'" class="btn btn-sm btn-success" @click="openJisrReviewModal(submission, 'accepted')">اعتماد</button>
                 <button class="btn btn-sm btn-danger" @click="openJisrReviewModal(submission, 'rejected')">إعادة للطالب</button>
               </td>
             </tr>
@@ -110,41 +116,6 @@
               <td class="d-flex gap-2">
                 <button class="btn btn-sm btn-success" @click="approvePending(student.id)">{{ t('approved') }}</button>
                 <button class="btn btn-sm btn-danger" @click="rejectPending(student.id)">{{ t('rejected') }}</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card border-0 shadow-sm p-3 mb-4">
-      <h5 class="fw-bold mb-3">{{ t('pending') }} {{ t('applications') }}</h5>
-      <div v-if="pendingTrainingApplications.length === 0" class="text-muted">{{ t('no_pending_applications') }}</div>
-      <div v-else class="table-responsive">
-        <table class="table align-middle">
-          <thead>
-            <tr>
-              <th>{{ t('student') }}</th>
-              <th>{{ t('program') }}</th>
-              <th>حالة الشركة</th>
-              <th>{{ t('actions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="app in pendingTrainingApplications" :key="app.id">
-              <td>
-                <div class="fw-bold">{{ app.student_name }}</div>
-                <small class="text-muted">{{ app.student_email }}</small>
-              </td>
-              <td>{{ app.program_title || '-' }}</td>
-              <td>
-                <span class="badge" :class="companyStatusBadge(app.company_status)">
-                  {{ companyStatusText(app.company_status) }}
-                </span>
-              </td>
-              <td class="d-flex gap-2">
-                <button class="btn btn-sm btn-success" @click="approveApplication(app.id)">{{ t('approved') }}</button>
-                <button class="btn btn-sm btn-danger" @click="rejectApplication(app.id)">{{ t('rejected') }}</button>
               </td>
             </tr>
           </tbody>
@@ -250,6 +221,55 @@
     </div>
 
     <Teleport to="body">
+      <div v-if="createStudentModal.open" class="reject-modal-overlay" @click.self="closeCreateStudentModal">
+        <div class="reject-modal-card">
+          <div class="reject-modal-header">
+            <div>
+              <h5 class="fw-bold mb-1">{{ t('add_student') }}</h5>
+              <p class="text-muted small mb-0">{{ t('add_student_desc') }}</p>
+            </div>
+            <button class="btn-close" type="button" @click="closeCreateStudentModal"></button>
+          </div>
+
+          <form class="create-student-form" @submit.prevent="createStudent">
+            <label class="form-label fw-bold small">{{ t('name') }}</label>
+            <input v-model.trim="createStudentForm.name" class="form-control" required>
+
+            <label class="form-label fw-bold small">{{ t('email') }}</label>
+            <input v-model.trim="createStudentForm.email" type="email" class="form-control" required>
+
+            <label class="form-label fw-bold small">{{ t('student_id') }}</label>
+            <input v-model.trim="createStudentForm.university_id" class="form-control">
+
+            <label class="form-label fw-bold small">{{ t('phone') }}</label>
+            <input v-model.trim="createStudentForm.phone_number" class="form-control">
+
+            <label class="form-label fw-bold small">{{ t('password') }}</label>
+            <input v-model="createStudentForm.password" type="text" minlength="6" class="form-control" required>
+
+            <label class="form-label fw-bold small">{{ t('status') }}</label>
+            <select v-model="createStudentForm.status" class="form-select">
+              <option value="active">{{ t('approved') }}</option>
+              <option value="pending">{{ t('pending') }}</option>
+            </select>
+
+            <div v-if="createStudentModal.error" class="alert alert-danger rounded-4 mb-0">
+              {{ createStudentModal.error }}
+            </div>
+
+            <div class="reject-actions">
+              <button type="button" class="btn btn-light" @click="closeCreateStudentModal">{{ t('cancel') }}</button>
+              <button type="submit" class="btn btn-primary" :disabled="createStudentModal.submitting">
+                <span v-if="createStudentModal.submitting">{{ t('saving') }}</span>
+                <span v-else>{{ t('save_student') }}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
       <div v-if="rejectModal.open" class="reject-modal-overlay" @click.self="closeRejectModal">
         <div class="reject-modal-card">
           <div class="reject-modal-header">
@@ -344,6 +364,19 @@ const pendingTrainingApplications = ref([])
 const approvedStudents = ref([])
 const rejectedStudents = ref([])
 const jisrReviews = ref([])
+const createStudentModal = ref({
+  open: false,
+  submitting: false,
+  error: ''
+})
+const createStudentForm = ref({
+  name: '',
+  email: '',
+  university_id: '',
+  phone_number: '',
+  password: '',
+  status: 'active'
+})
 const rejectModal = ref({
   open: false,
   type: null,
@@ -420,6 +453,42 @@ const deleteStudent = async (id) => {
 const goStudent = (id) => router.push(`/supervisor/student/${id}`)
 const goJisrReviews = () => router.push('/supervisor/jisr-reviews')
 const openBoard = (url) => { if (url) window.location.href = url }
+
+const defaultPassword = () => `student${Math.floor(100000 + Math.random() * 900000)}`
+
+const openCreateStudentModal = () => {
+  createStudentForm.value = {
+    name: '',
+    email: '',
+    university_id: '',
+    phone_number: '',
+    password: defaultPassword(),
+    status: 'active'
+  }
+  createStudentModal.value = { open: true, submitting: false, error: '' }
+}
+
+const closeCreateStudentModal = () => {
+  createStudentModal.value = { open: false, submitting: false, error: '' }
+}
+
+const createStudent = async () => {
+  createStudentModal.value.submitting = true
+  createStudentModal.value.error = ''
+
+  try {
+    await supervisorAPI.createStudent(createStudentForm.value)
+    closeCreateStudentModal()
+    await loadStudents()
+  } catch (error) {
+    const errors = error?.response?.data?.errors
+    createStudentModal.value.error = errors
+      ? Object.values(errors).flat().join(' ')
+      : (error?.response?.data?.message || t('error_occurred'))
+  } finally {
+    createStudentModal.value.submitting = false
+  }
+}
 
 const jisrStatusText = (status) => ({
   pending_review: 'بانتظار التقييم',
@@ -625,6 +694,12 @@ onMounted(async () => {
 .reject-textarea:focus {
   border-color: #dc3545;
   box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.12);
+}
+
+.create-student-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .reject-actions {

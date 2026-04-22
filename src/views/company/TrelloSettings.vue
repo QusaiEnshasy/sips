@@ -8,17 +8,17 @@
             <i class="bi bi-trello"></i>
           </div>
           <div>
-            <h2 class="fw-bold mb-2">تكامل Trello</h2>
-            <p class="text-muted mb-0">اربط حساب Trello الخاص بالشركة وزامن البطاقات كمهام للطلاب.</p>
+            <h2 class="fw-bold mb-2">{{ t('trello_integration') }}</h2>
+            <p class="text-muted mb-0">{{ t('trello_integration_subtitle') }}</p>
           </div>
         </div>
         <router-link to="/company/dashboard" class="btn-back">
           <i class="bi bi-arrow-left me-2"></i>
-          العودة للوحة التحكم
+          {{ t('back_to_dashboard') }}
         </router-link>
         <button type="button" class="btn-trello-direct" @click="openTrelloHome">
           <i class="bi bi-box-arrow-up-right me-2"></i>
-          فتح Trello الرسمي
+          {{ t('open_official_trello') }}
         </button>
       </div>
     </div>
@@ -29,38 +29,38 @@
         <div class="settings-card" data-aos="fade-up">
           <div class="card-header-custom">
             <i class="bi bi-shield-lock"></i>
-            <h5 class="fw-bold mb-0">الربط الرسمي مع Trello</h5>
+            <h5 class="fw-bold mb-0">{{ t('official_trello_connection') }}</h5>
           </div>
 
           <div v-if="hasTrello" class="connected-oauth-box mb-4">
             <div>
-              <strong>حساب Trello مربوط</strong>
-              <span>التوكن محفوظ تلقائيا بالخلفية ومشفر داخل النظام.</span>
+              <strong>{{ t('trello_account_connected') }}</strong>
+              <span>{{ t('trello_token_saved_securely') }}</span>
             </div>
             <i class="bi bi-check2-circle"></i>
           </div>
 
           <div v-else class="alert-info mb-4">
             <i class="bi bi-info-circle me-2"></i>
-            اضغط الزر وسيفتح Trello بشكل طبيعي. بعد الموافقة سيرجعك للنظام ويحفظ Token تلقائيا بدون نسخه أو كتابته.
+            {{ t('trello_connect_hint') }}
           </div>
 
           <div class="d-flex gap-3 flex-wrap">
             <button class="btn-accent-gradient" @click="connectWithTrello" :disabled="isAuthorizing">
               <span v-if="isAuthorizing" class="spinner-border spinner-border-sm me-2"></span>
               <i v-else class="bi bi-box-arrow-up-right me-2"></i>
-              {{ hasTrello ? 'إعادة ربط Trello' : 'الدخول إلى Trello وربط الحساب' }}
+              {{ hasTrello ? t('reconnect_trello') : t('login_to_trello_connect') }}
             </button>
 
             <button v-if="hasTrello" class="btn-outline" @click="testConnection" :disabled="isTesting">
               <span v-if="isTesting" class="spinner-border spinner-border-sm me-2"></span>
               <i v-else class="bi bi-plug me-2"></i>
-              اختبار الاتصال
+              {{ t('test_connection') }}
             </button>
 
             <button v-if="hasTrello" class="btn-outline text-danger" @click="disconnectTrello">
               <i class="bi bi-unlink me-2"></i>
-              فصل Trello
+              {{ t('disconnect_trello') }}
             </button>
           </div>
 
@@ -76,31 +76,31 @@
         <div class="settings-card" data-aos="fade-up">
           <div class="card-header-custom">
             <i class="bi bi-key"></i>
-            <h5 class="fw-bold mb-0">إعدادات الربط</h5>
+            <h5 class="fw-bold mb-0">{{ t('connection_settings') }}</h5>
           </div>
           
           <div class="alert-info mb-4">
             <i class="bi bi-info-circle me-2"></i>
-            تحتاج الشركة إلى Token من حساب Trello الخاص بها. يمكن ترك API Key فارغًا لاستخدام مفتاح النظام.
+            {{ t('manual_token_help') }}
             <a href="https://trello.com/power-ups/admin" target="_blank" class="ms-2">
-              فتح Trello Power-Ups <i class="bi bi-box-arrow-up-right"></i>
+              {{ t('open_trello_powerups') }} <i class="bi bi-box-arrow-up-right"></i>
             </a>
           </div>
           
           <div class="mb-3">
-            <label class="form-label fw-bold">API Key <span class="text-muted small">(اختياري)</span></label>
+            <label class="form-label fw-bold">API Key <span class="text-muted small">({{ t('optional') }})</span></label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-key"></i></span>
-              <input type="text" class="form-control" v-model="apiKey" placeholder="اتركه فارغًا لاستخدام مفتاح النظام">
+              <input type="text" class="form-control" v-model="apiKey" :placeholder="t('leave_empty_system_key')">
             </div>
-            <div class="form-text">لا تضع الإيميل هنا. هذه الخانة للمفتاح الطويل فقط، ويمكن تركها فارغة.</div>
+            <div class="form-text">{{ t('do_not_put_email_here') }}</div>
           </div>
           
           <div class="mb-4">
-            <label class="form-label fw-bold">Token الخاص بحساب الشركة</label>
+            <label class="form-label fw-bold">{{ t('company_trello_token') }}</label>
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-lock"></i></span>
-              <input :type="showToken ? 'text' : 'password'" class="form-control" v-model="apiToken" placeholder="الصق Token الذي أخذته من Trello">
+              <input :type="showToken ? 'text' : 'password'" class="form-control" v-model="apiToken" :placeholder="t('paste_trello_token')">
               <button class="input-group-text" @click="showToken = !showToken">
                 <i :class="showToken ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
               </button>
@@ -110,11 +110,11 @@
           <div class="d-flex gap-3">
             <button class="btn-accent-gradient" @click="saveSettings" :disabled="isSaving">
               <i class="bi bi-save me-2"></i>
-              حفظ الإعدادات
+              {{ t('save_settings') }}
             </button>
             <button class="btn-outline" @click="testConnection" :disabled="isTesting">
               <i class="bi bi-plug me-2"></i>
-              اختبار الاتصال
+              {{ t('test_connection') }}
             </button>
           </div>
           
@@ -130,18 +130,18 @@
         <div class="boards-card" data-aos="fade-up" data-aos-delay="100">
           <div class="card-header-custom">
             <i class="bi bi-kanban"></i>
-            <h5 class="fw-bold mb-0">اللوحات المتاحة</h5>
+            <h5 class="fw-bold mb-0">{{ t('available_boards') }}</h5>
           </div>
           
           <div v-if="isLoadingBoards" class="text-center py-5">
             <div class="spinner-border text-primary" role="status"></div>
-            <p class="text-muted mt-3">جاري تحميل اللوحات...</p>
+            <p class="text-muted mt-3">{{ t('loading_boards') }}</p>
           </div>
           
           <div v-else-if="boards.length === 0" class="empty-state text-center py-5">
             <i class="bi bi-kanban fs-1 text-muted"></i>
-            <p class="text-muted mt-3">لا توجد لوحات ظاهرة</p>
-            <p class="small text-muted">احفظ Token صحيح أولًا، ثم اختبر الاتصال.</p>
+            <p class="text-muted mt-3">{{ t('no_visible_boards') }}</p>
+            <p class="small text-muted">{{ t('save_valid_token_first') }}</p>
           </div>
           
           <div v-else class="boards-list">
@@ -157,7 +157,7 @@
               </div>
               <button class="btn-accent-outline" @click="openConnectModal(board)">
                 <i class="bi bi-link me-1"></i>
-              ربط
+              {{ t('connect') }}
               </button>
             </div>
           </div>
@@ -171,10 +171,10 @@
           <i class="bi bi-list-check"></i>
         </div>
         <div>
-          <h5 class="fw-bold mb-1">شروط إنشاء المهمة داخل Trello</h5>
-          <p class="text-muted mb-1">أنشئ الكرت داخل Trello الحقيقي في القائمة المرتبطة بالبرنامج، ثم اضغط مزامنة من هنا.</p>
-          <small class="text-muted d-block">إذا أردت المهمة لكل طلاب التدريب، أنشئ الكرت بشكل طبيعي داخل Trello وسيظهر تلقائيا.</small>
-          <small class="text-muted d-block">إذا أردتها لطالب محدد فقط، اكتب داخل العنوان أو الوصف مثل: <strong>student: student@email.com</strong> أو <strong>student_id: 123456</strong>.</small>
+          <h5 class="fw-bold mb-1">{{ t('trello_task_rules_title') }}</h5>
+          <p class="text-muted mb-1">{{ t('trello_task_rules_intro') }}</p>
+          <small class="text-muted d-block">{{ t('trello_task_rule_all_students') }}</small>
+          <small class="text-muted d-block" v-html="t('trello_task_rule_specific_student')"></small>
         </div>
       </div>
     </div>
@@ -183,7 +183,7 @@
     <div class="integrations-card mt-4" data-aos="fade-up" data-aos-delay="200">
       <div class="card-header-custom">
         <i class="bi bi-link-45deg"></i>
-        <h5 class="fw-bold mb-0">البرامج المرتبطة</h5>
+        <h5 class="fw-bold mb-0">{{ t('linked_programs') }}</h5>
         <span class="badge ms-2" :class="integrations.length ? 'bg-primary' : 'bg-secondary'">
           {{ integrations.length }}
         </span>
@@ -212,9 +212,9 @@
                 <span><i class="bi bi-arrow-repeat me-1"></i> {{ t('last_sync') }}: {{ formatDate(int.last_sync) }}</span>
                 <span class="mx-2">|</span>
                 <span>
-                  جديد: {{ int.latest_log?.created_count ?? 0 }} |
-                  محدث: {{ int.latest_log?.updated_count ?? 0 }} |
-                  متخطى: {{ int.latest_log?.skipped_count ?? 0 }}
+                  {{ t('new_count') }}: {{ int.latest_log?.created_count ?? 0 }} |
+                  {{ t('updated_count') }}: {{ int.latest_log?.updated_count ?? 0 }} |
+                  {{ t('skipped_count') }}: {{ int.latest_log?.skipped_count ?? 0 }}
                 </span>
                 <span v-if="int.sync_status === 'syncing'" class="text-warning ms-2">
                   <i class="bi bi-hourglass-split"></i> {{ t('syncing') }}
@@ -232,7 +232,7 @@
             </div>
           </div>
           <div class="integration-actions">
-            <button class="btn-icon-accent" @click="openTrelloBoard(int)" title="فتح Trello">
+            <button class="btn-icon-accent" @click="openTrelloBoard(int)" :title="t('open_trello')">
               <i class="bi bi-box-arrow-up-right"></i>
             </button>
             <button class="btn-icon-accent" @click="syncInternship(int)" :title="t('sync_now')">
@@ -249,27 +249,27 @@
     <div class="integrations-card mt-4" data-aos="fade-up" data-aos-delay="250">
       <div class="card-header-custom">
         <i class="bi bi-clock-history"></i>
-        <h5 class="fw-bold mb-0">سجل المزامنة</h5>
+        <h5 class="fw-bold mb-0">{{ t('sync_log') }}</h5>
       </div>
 
       <div v-if="syncLogs.length === 0" class="empty-state-small text-center py-4">
         <i class="bi bi-inbox fs-3 text-muted"></i>
-        <p class="text-muted mt-2 mb-0">لا توجد عمليات مزامنة بعد.</p>
+        <p class="text-muted mt-2 mb-0">{{ t('no_sync_logs_yet') }}</p>
       </div>
 
       <div v-else class="sync-log-list">
         <div v-for="log in syncLogs" :key="log.id" class="sync-log-item">
           <div>
-            <div class="fw-bold">{{ log.program || 'برنامج غير محدد' }}</div>
+            <div class="fw-bold">{{ log.program || t('unknown_program') }}</div>
             <small class="text-muted">
-              {{ log.trigger === 'manual' ? 'يدوي' : 'تلقائي سابق' }} |
+              {{ log.trigger === 'manual' ? t('manual') : t('previous_auto') }} |
               {{ formatDate(log.finished_at || log.started_at) }}
             </small>
           </div>
           <div class="sync-log-counts">
-            <span class="badge bg-success">جديد {{ log.created }}</span>
-            <span class="badge bg-primary">محدث {{ log.updated }}</span>
-            <span class="badge bg-secondary">متخطى {{ log.skipped }}</span>
+            <span class="badge bg-success">{{ t('new_count') }} {{ log.created }}</span>
+            <span class="badge bg-primary">{{ t('updated_count') }} {{ log.updated }}</span>
+            <span class="badge bg-secondary">{{ t('skipped_count') }} {{ log.skipped }}</span>
             <span class="badge" :class="log.status === 'success' ? 'bg-success' : (log.status === 'failed' ? 'bg-danger' : 'bg-warning')">
               {{ log.status }}
             </span>
@@ -314,24 +314,24 @@
               </div>
 
               <div class="mb-4">
-                <label class="form-label fw-bold">نمط توزيع المهام على الطلاب</label>
+                <label class="form-label fw-bold">{{ t('assignment_mode_label') }}</label>
                 <select class="form-select" v-model="assignmentMode">
-                  <option value="all">كل الطلاب المقبولين بهذا التدريب</option>
-                  <option value="marker_required">حسب تحديد الطالب داخل الكرت فقط</option>
-                  <option value="selected">طلاب محددين فقط</option>
+                  <option value="all">{{ t('assignment_mode_all') }}</option>
+                  <option value="marker_required">{{ t('assignment_mode_marker') }}</option>
+                  <option value="selected">{{ t('assignment_mode_selected') }}</option>
                 </select>
                 <div class="small text-muted mt-1">
-                  هذا الخيار يحدد من سيرى الكروت الجديدة إذا لم تضف `student:` داخل الكرت.
+                  {{ t('assignment_mode_hint') }}
                 </div>
               </div>
 
               <div v-if="assignmentMode === 'selected'" class="mb-4">
-                <label class="form-label fw-bold">اختر الطلاب المستهدفين</label>
+                <label class="form-label fw-bold">{{ t('select_target_students') }}</label>
                 <div v-if="isLoadingInternshipStudents" class="small text-muted mb-2">
-                  <i class="bi bi-hourglass-split"></i> جاري تحميل الطلاب...
+                  <i class="bi bi-hourglass-split"></i> {{ t('loading_students') }}
                 </div>
                 <div v-else-if="internshipStudents.length === 0" class="small text-danger mb-2">
-                  لا يوجد طلاب مقبولين حاليًا ضمن هذا التدريب.
+                  {{ t('no_approved_students_in_training') }}
                 </div>
                 <div v-else class="students-picker">
                   <label v-for="student in internshipStudents" :key="student.id" class="student-chip">
@@ -413,12 +413,12 @@ const connectionStatusIcon = computed(() => {
 })
 
 const trelloOAuthMessages = {
-  email_mismatch: 'حساب Trello يجب أن يكون بنفس إيميل حساب الشركة داخل النظام.',
-  missing_oauth_data: 'Trello لم يرجع بيانات الربط المطلوبة. حاول الربط مرة أخرى.',
-  session_expired: 'انتهت جلسة الربط. اضغط ربط Trello مرة أخرى من نفس المتصفح.',
-  profile_failed: 'تمت الموافقة لكن تعذر قراءة بيانات حساب Trello.',
-  oauth_failed: 'تمت الموافقة لكن فشل حفظ الربط. سنعرض السبب في سجل Laravel.',
-  access_denied: 'تم إلغاء الموافقة من Trello.',
+  email_mismatch: t('trello_email_mismatch'),
+  missing_oauth_data: t('trello_missing_oauth_data'),
+  session_expired: t('trello_session_expired'),
+  profile_failed: t('trello_profile_failed'),
+  oauth_failed: t('trello_oauth_failed'),
+  access_denied: t('trello_access_denied'),
 }
 
 const handleTrelloOAuthResult = () => {
@@ -427,10 +427,10 @@ const handleTrelloOAuthResult = () => {
   const error = params.get('trello_error')
 
   if (connected) {
-    connectionStatus.value = 'تم ربط Trello بنجاح وحفظ التوكن بالخلفية.'
+    connectionStatus.value = t('trello_connected_successfully')
     connectionStatusClass.value = 'text-success'
   } else if (error) {
-    connectionStatus.value = trelloOAuthMessages[error] || `تعذر ربط Trello: ${error}`
+    connectionStatus.value = trelloOAuthMessages[error] || t('trello_connection_error', { error })
     connectionStatusClass.value = 'text-danger'
   } else {
     return
@@ -463,23 +463,23 @@ const connectWithTrello = async () => {
   window.location.href = '/company/trello/connect'
   return
 
-  const verifier = window.prompt('بعد ما تضغط Allow في Trello، انسخ كود الموافقة الذي يظهر والصقه هنا. هذا ليس Token، فقط كود مؤقت لتوليد التوكن بالخلفية.')
+  const verifier = window.prompt(t('trello_pin_prompt'))
 
   if (!verifier) {
     isAuthorizing.value = false
-    connectionStatus.value = 'تم إلغاء الربط. اضغط الزر مرة أخرى إذا أردت المحاولة.'
+    connectionStatus.value = t('trello_connection_cancelled')
     connectionStatusClass.value = 'text-info'
     return
   }
 
   try {
     await companyAPI.completeTrelloPinAuthorization({ oauth_verifier: verifier.trim() })
-    connectionStatus.value = 'تم ربط Trello بنجاح وحفظ التوكن بالخلفية.'
+    connectionStatus.value = t('trello_connected_successfully')
     connectionStatusClass.value = 'text-success'
     await loadSettings()
     await loadIntegrations()
   } catch (error) {
-    connectionStatus.value = error?.response?.data?.message || 'تعذر إكمال ربط Trello. تأكد من الكود وحاول مرة أخرى.'
+    connectionStatus.value = error?.response?.data?.message || t('trello_complete_failed')
     connectionStatusClass.value = 'text-danger'
   } finally {
     isAuthorizing.value = false
@@ -602,7 +602,7 @@ const connectInternship = async () => {
   }
 
   if (assignmentMode.value === 'selected' && selectedTargetStudentIds.value.length === 0) {
-    alert('اختر طالبًا واحدًا على الأقل عند استخدام نمط طلاب محددين.')
+    alert(t('select_at_least_one_student'))
     return
   }
   
@@ -631,7 +631,11 @@ const syncInternship = async (integration) => {
   try {
     const response = await companyAPI.syncTrello(integration.internship_id)
     const result = response.data?.data || {}
-    alert(`تمت المزامنة: جديد ${result.created || 0}، محدث ${result.updated || 0}، متخطى ${result.skipped || 0}`)
+    alert(t('sync_completed_counts', {
+      created: result.created || 0,
+      updated: result.updated || 0,
+      skipped: result.skipped || 0
+    }))
     await loadIntegrations()
     await loadSyncLogs()
   } catch (error) {
@@ -651,7 +655,7 @@ const openTrelloHome = () => {
 }
 
 const disconnectTrello = async () => {
-  if (!confirm('سيتم فصل حساب Trello من النظام. هل أنت متأكد؟')) return
+  if (!confirm(t('confirm_disconnect_trello_account'))) return
 
   try {
     await companyAPI.disconnectTrello()
@@ -659,10 +663,10 @@ const disconnectTrello = async () => {
     boards.value = []
     integrations.value = []
     syncLogs.value = []
-    connectionStatus.value = 'تم فصل Trello بنجاح.'
+    connectionStatus.value = t('trello_disconnected_successfully')
     connectionStatusClass.value = 'text-success'
   } catch (error) {
-    alert(error?.response?.data?.message || 'تعذر فصل Trello.')
+    alert(error?.response?.data?.message || t('trello_disconnect_failed'))
   }
 }
 

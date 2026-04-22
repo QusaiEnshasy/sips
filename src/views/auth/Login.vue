@@ -105,6 +105,11 @@ const identifierMode = ref('id')
 const isLoading = ref(false)
 const showPassword = ref(false)
 const flash = window.__FLASH__ ?? {}
+const registerSuccessMessage = ref(sessionStorage.getItem('register_success_message') || '')
+
+if (registerSuccessMessage.value) {
+  sessionStorage.removeItem('register_success_message')
+}
 
 const form = reactive({
   identifier: '',
@@ -113,14 +118,18 @@ const form = reactive({
 })
 
 const flashMessage = computed(() => {
+  if (registerSuccessMessage.value) {
+    return registerSuccessMessage.value
+  }
+
   if (flash.success) {
-    return 'تم إنشاء الحساب بنجاح، وحالتك الآن قيد انتظار الاعتماد من المشرف.'
+    return flash.success
   }
 
   return flash.error || flash.status || ''
 })
-const flashMessageClass = computed(() => (flash.success || flash.status ? 'is-success' : 'is-error'))
-const flashMessageIcon = computed(() => (flash.success || flash.status ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'))
+const flashMessageClass = computed(() => (registerSuccessMessage.value || flash.success || flash.status ? 'is-success' : 'is-error'))
+const flashMessageIcon = computed(() => (registerSuccessMessage.value || flash.success || flash.status ? 'fas fa-circle-check' : 'fas fa-circle-exclamation'))
 
 const setIdentifierMode = (mode) => {
   identifierMode.value = mode

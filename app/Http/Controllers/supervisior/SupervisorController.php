@@ -13,6 +13,7 @@ use App\Models\JisrTask;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use App\Services\NotificationService;
@@ -406,6 +407,62 @@ class SupervisorController extends Controller
         return view('spa');
     }
 
+    public function createStudent(Request $request): JsonResponse
+    {
+        $this->ensureRole();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'university_id' => ['nullable', 'string', 'max:255', 'unique:users,university_id'],
+            'phone_number' => ['nullable', 'string', 'max:30'],
+            'password' => ['required', 'string', 'min:6', 'max:255'],
+            'status' => ['nullable', 'in:pending,active'],
+        ]);
+
+        $payload = [
+            'name' => trim($validated['name']),
+            'email' => strtolower(trim($validated['email'])),
+            'university_id' => $validated['university_id'] ?? null,
+            'phone_number' => $validated['phone_number'] ?? null,
+            'role' => 'student',
+            'password' => Hash::make($validated['password']),
+            'status' => $validated['status'] ?? 'active',
+            'supervisor_code' => $request->user()->supervisor_code,
+        ];
+
+        foreach ([
+            'skill_test_required' => true,
+            'skill_test_passed' => false,
+            'is_in_jisr' => false,
+        ] as $column => $value) {
+            if (Schema::hasColumn('users', $column)) {
+                $payload[$column] = $value;
+            }
+        }
+
+        $student = User::create($payload);
+
+        $this->notifications->notifyUser(
+            userId: (int) $student->id,
+            title: 'Student Account Created',
+            description: 'Your supervisor created your student account. You can sign in with the provided credentials.',
+            type: 'success',
+            meta: ['category' => 'auth']
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Student created successfully.',
+            'data' => [
+                'id' => $student->id,
+                'name' => $student->name,
+                'email' => $student->email,
+                'status' => $student->status,
+            ],
+        ], 201);
+    }
+
     public function pendingStudentsPage()
     {
         $this->ensureRole();
@@ -590,7 +647,14 @@ class SupervisorController extends Controller
         $totalTasks = JisrTask::query()->count();
         $programCompleted = $totalTasks > 0 && $acceptedCount >= $totalTasks;
 
-        if ($programCompleted) {
+        if ($status === 'rejected') {
+            $student->forceFill([
+                'is_in_jisr' => true,
+                'skill_test_required' => false,
+                'skill_test_passed' => false,
+                'jisr_completed_at' => null,
+            ])->save();
+        } elseif ($programCompleted) {
             $student->forceFill([
                 'is_in_jisr' => false,
                 'skill_test_required' => true,

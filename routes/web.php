@@ -156,6 +156,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/supervisor/dashboard', [SupervisorController::class, 'dashboard'])->name('supervisor.dashboard');
     Route::get('/supervisor/dashboard/data', [SupervisorController::class, 'dashboardData'])->name('supervisor.dashboard.data');
     Route::get('/supervisor/students', [SupervisorController::class, 'studentsPage'])->name('supervisor.students.index');
+    Route::post('/supervisor/students', [SupervisorController::class, 'createStudent'])->name('supervisor.students.store');
     Route::get('/supervisor/student/{id}', [SupervisorController::class, 'studentDetails'])->name('supervisor.students.show');
     Route::get('/supervisor/students/pending', [SupervisorController::class, 'pendingStudentsPage'])->name('supervisor.students.pending');
     Route::post('/supervisor/students/{id}/approve', [SupervisorController::class, 'supervisorActiveStudentAcouunt'])->name('supervisor.students.approve');

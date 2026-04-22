@@ -15,6 +15,7 @@ const webApi = axios.create({
 export const supervisorAPI = {
   getDashboard: () => webApi.get('/supervisor/dashboard/data'),
   getStudents: () => webApi.get('/supervisor/students'),
+  createStudent: (data) => webApi.post('/supervisor/students', data),
   getStudent: (id) => webApi.get(`/supervisor/student/${id}`),
   getJisrReviews: () => webApi.get('/supervisor/jisr-reviews/data'),
   reviewJisrSubmission: (id, data) => webApi.post(`/supervisor/jisr-reviews/${id}/review`, data),

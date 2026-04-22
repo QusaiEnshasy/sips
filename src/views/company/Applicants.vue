@@ -291,11 +291,17 @@ const changePage = (page) => {
   }
 }
 
-const viewApplicant = () => {
-  router.push('/company/training-tasks')
+const viewApplicant = (applicant) => {
+  if (!applicant?.id) return
+  router.push(`/company/applicants/${applicant.id}`)
 }
 
-const openBoard = () => {
+const openBoard = (item) => {
+  if (item?.board_url) {
+    window.location.href = item.board_url
+    return
+  }
+
   router.push('/company/training-tasks')
 }
 

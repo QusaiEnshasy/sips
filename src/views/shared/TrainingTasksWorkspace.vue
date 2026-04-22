@@ -1,16 +1,14 @@
 <template>
-  <div class="training-tasks-page" dir="rtl">
+  <div class="training-tasks-page" :dir="currentLang === 'ar' ? 'rtl' : 'ltr'">
     <section class="hero-panel">
       <div>
-        <span class="eyebrow">مساحة التدريب</span>
-        <h1>مهام التدريب والتقييم</h1>
-        <p>
-          الشركة تنشئ المهام، والطالب يرى مهامه فقط، وكل تسليم وتقييم محفوظ بشكل منفصل لكل طالب.
-        </p>
+        <span class="eyebrow">{{ t('training_space') }}</span>
+        <h1>{{ t('training_tasks_evaluation') }}</h1>
+        <p>{{ t('training_tasks_workspace_intro') }}</p>
       </div>
       <button class="refresh-btn" :disabled="loading" @click="loadWorkspace">
         <i class="bi bi-arrow-clockwise"></i>
-        تحديث
+        {{ t('refresh') }}
       </button>
     </section>
 
@@ -24,111 +22,38 @@
     <div v-if="error" class="alert-box">{{ error }}</div>
     <div v-if="success" class="success-box">{{ success }}</div>
 
-        <section v-if="role === 'company'" class="create-panel">
+    <section v-if="role === 'supervisor'" class="create-panel">
       <div class="section-heading">
         <div>
-          <h2>إدارة مهام الشركة من Trello</h2>
-          <p>أنشئ وعدّل المهام داخل بورد Trello الحقيقي، والنظام يزامنها تلقائيًا عند فتح هذه الشاشة.</p>
+          <h2>{{ t('create_task_from_system') }}</h2>
+          <p>{{ t('create_task_from_system_desc') }}</p>
         </div>
         <div class="d-flex gap-2">
           <button class="secondary-action" type="button" @click="syncNow" :disabled="loading">
-            مزامنة الآن
-          </button>
-          <router-link class="primary-action link-action" to="/company/trello-settings">
-            إعدادات Trello
-          </router-link>
-        </div>
-      </div>
-    </section>
-
-    <section v-if="role === 'company' && companyEvaluationApplications.length" class="final-evaluation-panel">
-      <div class="section-heading">
-        <div>
-          <h2>التقييم النهائي من الشركة</h2>
-          <p>هؤلاء الطلاب انتهت مدة تدريبهم. قيّم كل طالب بعلامة نهائية وملاحظة حتى تكتمل النتيجة مع تقييم المشرف.</p>
-        </div>
-      </div>
-
-      <div class="evaluation-grid">
-        <article v-for="application in companyEvaluationApplications" :key="application.id" class="evaluation-student-card">
-          <div class="evaluation-student-head">
-            <div>
-              <strong>{{ application.student_name }}</strong>
-              <small>{{ application.student_email }}</small>
-            </div>
-            <span>{{ application.program_title }}</span>
-          </div>
-
-          <div class="evaluation-status">
-            <span>نهاية التدريب: {{ application.training_end_date || '-' }}</span>
-            <span>تقييم المشرف: {{ application.supervisor_final_score ?? 'بانتظار المشرف' }}</span>
-          </div>
-
-          <div v-if="application.company_final_score !== null" class="success-box compact">
-            تم حفظ تقييم الشركة: {{ application.company_final_score }}/100
-          </div>
-
-          <form v-else class="final-evaluation-form" @submit.prevent="saveCompanyEvaluation(application)">
-            <label>
-              علامة الشركة النهائية
-              <input
-                v-model.number="companyEvaluations[application.id].score"
-                type="number"
-                min="0"
-                max="100"
-                required
-                placeholder="0 - 100"
-              />
-            </label>
-            <label>
-              ملاحظات الشركة
-              <textarea
-                v-model.trim="companyEvaluations[application.id].note"
-                rows="3"
-                required
-                placeholder="اكتب ملاحظتك النهائية على أداء الطالب"
-              ></textarea>
-            </label>
-            <button class="primary-action compact" :disabled="savingEvaluationId === application.id">
-              حفظ تقييم الشركة
-            </button>
-          </form>
-        </article>
-      </div>
-    </section>
-
-        <section v-if="role === 'supervisor'" class="create-panel">
-      <div class="section-heading">
-        <div>
-          <h2>إنشاء مهمة من النظام (شركة/مشرف)</h2>
-          <p>حدد التدريب والطلاب من داخل الموقع، وسيتم إنشاء كرت Trello تلقائيا.</p>
-        </div>
-        <div class="d-flex gap-2">
-          <button class="secondary-action" type="button" @click="syncNow" :disabled="loading">
-            مزامنة من Trello
+            {{ t('sync_from_trello') }}
           </button>
           <router-link v-if="role === 'company'" class="primary-action link-action" to="/company/trello-settings">
-            إعدادات Trello
+            {{ t('trello_settings') }}
           </router-link>
         </div>
       </div>
 
       <form class="task-form" @submit.prevent="createTask">
         <label>
-          عنوان المهمة
+          {{ t('task_title') }}
           <input v-model.trim="taskForm.title" required />
         </label>
 
         <label>
-          وصف المهمة
+          {{ t('task_description') }}
           <textarea v-model.trim="taskForm.description" rows="3"></textarea>
         </label>
 
         <div class="form-grid">
           <label>
-            التدريب
+            {{ t('training') }}
             <select v-model="taskForm.training_id" required>
-              <option value="">اختر تدريب</option>
+              <option value="">{{ t('select_training') }}</option>
               <option v-for="training in trainingOptions" :key="training.id" :value="training.id">
                 {{ training.program_title }}
               </option>
@@ -136,28 +61,32 @@
           </label>
 
           <label>
-            موعد التسليم
+            {{ t('due_date') }}
             <input type="date" v-model="taskForm.due_date" />
           </label>
 
           <label>
-            الوسم
+            {{ t('label') }}
             <select v-model="taskForm.label">
-              <option value="">بدون</option>
-              <option value="red">أحمر</option>
-              <option value="green">أخضر</option>
-              <option value="blue">أزرق</option>
+              <option value="">{{ t('none') }}</option>
+              <option value="red">{{ t('red') }}</option>
+              <option value="green">{{ t('green') }}</option>
+              <option value="blue">{{ t('blue') }}</option>
             </select>
           </label>
         </div>
 
         <div class="students-box">
           <div class="students-toolbar">
-            <strong>تعيين الطلاب</strong>
-            <button type="button" @click="toggleAllStudents">{{ allStudentsSelected ? 'إلغاء تحديد الكل' : 'تحديد الكل' }}</button>
+            <strong>{{ t('assign_students') }}</strong>
+            <button type="button" @click="toggleAllStudents">
+              {{ allStudentsSelected ? t('deselect_all') : t('select_all') }}
+            </button>
           </div>
 
-          <div v-if="filteredTrainingStudents.length === 0" class="empty-state small">لا يوجد طلاب ضمن التدريب المحدد.</div>
+          <div v-if="filteredTrainingStudents.length === 0" class="empty-state small">
+            {{ t('no_students_in_selected_training') }}
+          </div>
           <label v-for="application in filteredTrainingStudents" :key="application.id" class="student-row">
             <input type="checkbox" :value="application.student_id" v-model="selectedStudentIds" />
             <div>
@@ -167,47 +96,47 @@
           </label>
         </div>
 
-        <button class="primary-action" :disabled="savingTask">إنشاء المهمة + كرت Trello</button>
+        <button class="primary-action" :disabled="savingTask">{{ t('create_task_and_trello_card') }}</button>
       </form>
     </section>
 
     <section class="tasks-panel">
       <div class="section-heading">
         <div>
-          <h2>{{ role === 'student' ? 'مهامي التدريبية' : 'متابعة مهام الطلاب' }}</h2>
-          <p>{{ role === 'student' ? 'هذه المهام موجهة لك فقط.' : 'كل كارد يمثل مهمة طالب واحدة بتسليمها وتقييمها.' }}</p>
+          <h2>{{ role === 'student' ? t('my_training_tasks') : t('students_tasks_followup') }}</h2>
+          <p>{{ role === 'student' ? t('tasks_for_you_only') : t('each_card_represents_student_task') }}</p>
         </div>
       </div>
 
-      <div v-if="loading" class="empty-state">جاري تحميل المهام...</div>
-      <div v-else-if="tasks.length === 0" class="empty-state">لا توجد مهام تدريبية حالياً.</div>
+      <div v-if="loading" class="empty-state">{{ t('loading_tasks') }}</div>
+      <div v-else-if="tasks.length === 0" class="empty-state">{{ t('no_training_tasks') }}</div>
 
       <div v-else class="tasks-grid">
         <article v-for="task in tasks" :key="task.id" class="task-card" :class="`status-${task.status}`">
           <div class="task-topline">
             <span class="task-chip">{{ statusText(task.status) }}</span>
-            <span v-if="task.due_date" class="due-date">تسليم: {{ task.due_date }}</span>
+            <span v-if="task.due_date" class="due-date">{{ t('submission_due') }}: {{ task.due_date }}</span>
           </div>
 
           <h3>{{ task.title }}</h3>
-          <p class="task-details">{{ task.details || 'لا يوجد وصف إضافي.' }}</p>
+          <p class="task-details">{{ task.details || t('no_extra_description') }}</p>
 
           <div class="meta-grid">
-            <span><b>الطالب</b>{{ task.student?.name || '-' }}</span>
-            <span><b>البرنامج</b>{{ task.program || '-' }}</span>
-            <span><b>الشركة</b>{{ task.company || '-' }}</span>
-            <span><b>الحالة</b>{{ task.submitted ? 'تم التسليم' : 'بانتظار التسليم' }}</span>
-            <span><b>مصدر المهمة</b>{{ task.source === 'trello' ? 'Trello' : 'النظام' }}</span>
-            <span><b>أنشأها</b>{{ task.source === 'trello' ? 'الشركة من Trello' : creatorLabel(task.creator) }}</span>
+            <span><b>{{ t('student') }}</b>{{ task.student?.name || '-' }}</span>
+            <span><b>{{ t('program') }}</b>{{ task.program || '-' }}</span>
+            <span><b>{{ t('company') }}</b>{{ task.company || '-' }}</span>
+            <span><b>{{ t('status') }}</b>{{ task.submitted ? t('submitted') : t('waiting_submission') }}</span>
+            <span><b>{{ t('task_source') }}</b>{{ task.source === 'trello' ? 'Trello' : t('system') }}</span>
+            <span><b>{{ t('created_by') }}</b>{{ task.source === 'trello' ? t('company_from_trello') : creatorLabel(task.creator) }}</span>
           </div>
 
           <div v-if="task.student_solution" class="solution-box">
-            <strong>حل الطالب</strong>
+            <strong>{{ t('student_solution') }}</strong>
             <p>{{ task.student_solution }}</p>
           </div>
 
           <div v-if="task.attachments?.length" class="files-box">
-            <strong>الملفات المرفوعة</strong>
+            <strong>{{ t('uploaded_files') }}</strong>
             <a v-for="file in task.attachments" :key="file.id" :href="file.url" target="_blank" rel="noopener">
               <i class="bi bi-paperclip"></i>
               {{ file.filename }}
@@ -216,26 +145,26 @@
 
           <form v-if="role === 'student' && !task.submitted" class="submit-box" @submit.prevent="submitTask(task)">
             <label>
-              حل المهمة
-              <textarea v-model.trim="studentSubmissions[task.id]" required rows="3" placeholder="اكتب ملخص الحل أو رابط العمل"></textarea>
+              {{ t('task_solution') }}
+              <textarea v-model.trim="studentSubmissions[task.id]" required rows="3" :placeholder="t('task_solution_placeholder')"></textarea>
             </label>
             <label class="file-input">
-              رفع ملفات
+              {{ t('upload_files') }}
               <input type="file" multiple @change="setTaskFiles(task.id, $event)" />
             </label>
             <button class="primary-action compact" :disabled="submittingTaskId === task.id">
-              تسليم المهمة
+              {{ t('submit_task') }}
             </button>
           </form>
 
           <div v-if="role !== 'student'" class="grading-box">
             <div class="scores">
-              <span>تقييم الشركة: {{ task.company_score ?? '-' }}/50</span>
-              <span>تقييم المشرف: {{ task.supervisor_score ?? '-' }}/50</span>
+              <span>{{ t('company_evaluation') }}: {{ task.company_score ?? '-' }}/50</span>
+              <span>{{ t('supervisor_evaluation') }}: {{ task.supervisor_score ?? '-' }}/50</span>
             </div>
             <form @submit.prevent="gradeTask(task)">
               <input v-model.number="grades[task.id]" type="number" min="0" max="50" placeholder="0 - 50" required />
-              <button class="secondary-action" :disabled="gradingTaskId === task.id">حفظ التقييم</button>
+              <button class="secondary-action" :disabled="gradingTaskId === task.id">{{ t('save_evaluation') }}</button>
             </form>
           </div>
         </article>
@@ -246,13 +175,14 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from '@/composables/useI18n'
 import { trainingTasksAPI } from '@/services/api/trainingTasks'
 
+const { t, currentLang } = useI18n()
 const loading = ref(false)
 const savingTask = ref(false)
 const submittingTaskId = ref(null)
 const gradingTaskId = ref(null)
-const savingEvaluationId = ref(null)
 const error = ref('')
 const success = ref('')
 const role = ref('')
@@ -262,7 +192,6 @@ const selectedStudentIds = ref([])
 const studentSubmissions = ref({})
 const taskFiles = ref({})
 const grades = ref({})
-const companyEvaluations = ref({})
 const autoSyncTimer = ref(null)
 
 const taskForm = ref({
@@ -300,10 +229,10 @@ const filteredTrainingStudents = computed(() => {
 })
 
 const statCards = computed(() => [
-  { label: 'إجمالي المهام', value: tasks.value.length },
-  { label: 'بانتظار التسليم', value: tasks.value.filter((task) => !task.submitted).length },
-  { label: 'تم التسليم', value: tasks.value.filter((task) => task.submitted).length },
-  { label: 'تم التقييم', value: tasks.value.filter((task) => task.company_score !== null || task.supervisor_score !== null).length }
+  { label: t('total_tasks'), value: tasks.value.length },
+  { label: t('waiting_submission'), value: tasks.value.filter((task) => !task.submitted).length },
+  { label: t('submitted'), value: tasks.value.filter((task) => task.submitted).length },
+  { label: t('evaluated'), value: tasks.value.filter((task) => task.company_score !== null || task.supervisor_score !== null).length }
 ])
 
 const allStudentsSelected = computed(() => (
@@ -311,13 +240,6 @@ const allStudentsSelected = computed(() => (
 ))
 
 const canSyncWithTrello = computed(() => ['company', 'supervisor', 'student'].includes(role.value))
-
-const companyEvaluationApplications = computed(() => (
-  applications.value.filter((application) => (
-    application.training_ended
-    && !application.training_completed_at
-  ))
-))
 
 const loadWorkspace = async ({ silent = false } = {}) => {
   if (!silent) {
@@ -333,19 +255,9 @@ const loadWorkspace = async ({ silent = false } = {}) => {
       task.id,
       role.value === 'supervisor' ? task.supervisor_score : task.company_score
     ]))
-    companyEvaluations.value = {
-      ...companyEvaluations.value,
-      ...Object.fromEntries(applications.value.map((application) => [
-        application.id,
-        {
-          score: application.company_final_score ?? '',
-          note: application.company_final_note || ''
-        }
-      ]))
-    }
   } catch (e) {
     if (!silent) {
-      error.value = e?.response?.data?.message || 'تعذر تحميل شاشة التدريب.'
+      error.value = e?.response?.data?.message || t('training_workspace_load_failed')
     }
   } finally {
     if (!silent) {
@@ -366,7 +278,7 @@ const autoSyncFromTrello = async ({ silent = true } = {}) => {
     await loadWorkspace({ silent: true })
   } catch (e) {
     if (!silent) {
-      error.value = e?.response?.data?.message || 'تعذر تنفيذ مزامنة Trello.'
+      error.value = e?.response?.data?.message || t('trello_sync_failed')
     }
   } finally {
     if (!silent) {
@@ -390,12 +302,12 @@ const createTask = async () => {
       ...taskForm.value,
       student_ids: selectedStudentIds.value
     })
-    success.value = 'تم إنشاء المهمة بنجاح، وكل طالب أخذ نسخة خاصة للتسليم والتقييم.'
+    success.value = t('task_created_successfully')
     taskForm.value = { title: '', description: '', training_id: '', due_date: '', label: '' }
     selectedStudentIds.value = []
     await loadWorkspace()
   } catch (e) {
-    error.value = e?.response?.data?.message || 'تعذر إنشاء المهمة.'
+    error.value = e?.response?.data?.message || t('task_create_failed')
   } finally {
     savingTask.value = false
   }
@@ -418,10 +330,10 @@ const submitTask = async (task) => {
     formData.append('student_solution', studentSubmissions.value[task.id] || '')
     ;(taskFiles.value[task.id] || []).forEach((file) => formData.append('attachments[]', file))
     await trainingTasksAPI.submitTask(task.id, formData)
-    success.value = 'تم تسليم المهمة وإرسالها للشركة والمشرف.'
+    success.value = t('task_submitted_successfully')
     await loadWorkspace()
   } catch (e) {
-    error.value = e?.response?.data?.message || 'تعذر تسليم المهمة.'
+    error.value = e?.response?.data?.message || t('task_submit_failed')
   } finally {
     submittingTaskId.value = null
   }
@@ -437,58 +349,32 @@ const gradeTask = async (task) => {
       window.location.href = response.data.complete_url
       return
     }
-    success.value = 'تم حفظ التقييم بنجاح.'
+    success.value = t('evaluation_saved_successfully')
     await loadWorkspace()
   } catch (e) {
-    error.value = e?.response?.data?.message || 'تعذر حفظ التقييم.'
+    error.value = e?.response?.data?.message || t('evaluation_save_failed')
   } finally {
     gradingTaskId.value = null
   }
 }
 
 const statusText = (status) => {
-  if (status === 'done') return 'منجزة'
-  if (status === 'progress') return 'قيد التنفيذ'
-  return 'جديدة'
+  if (status === 'done') return t('done')
+  if (status === 'progress') return t('in_progress')
+  return t('new')
 }
 
 const creatorLabel = (creator) => {
   if (!creator) return '-'
-  if (creator.role === 'supervisor') return `المشرف: ${creator.name}`
-  if (creator.role === 'company') return `الشركة: ${creator.name}`
-  if (creator.role === 'admin') return `الإدارة: ${creator.name}`
+  if (creator.role === 'supervisor') return `${t('supervisor')}: ${creator.name}`
+  if (creator.role === 'company') return `${t('company')}: ${creator.name}`
+  if (creator.role === 'admin') return `${t('admin')}: ${creator.name}`
   return creator.name || '-'
 }
 
 const syncWhenVisible = () => {
   if (!document.hidden) {
     autoSyncFromTrello({ silent: true })
-  }
-}
-
-const saveCompanyEvaluation = async (application) => {
-  savingEvaluationId.value = application.id
-  error.value = ''
-  success.value = ''
-
-  try {
-    const form = companyEvaluations.value[application.id] || {}
-    const response = await trainingTasksAPI.saveCompanyEvaluation(application.id, {
-      company_final_score: form.score,
-      company_final_note: form.note
-    })
-
-    if (response.data?.complete_url) {
-      window.location.href = response.data.complete_url
-      return
-    }
-
-    success.value = response.data?.message || 'تم حفظ تقييم الشركة النهائي بنجاح.'
-    await loadWorkspace()
-  } catch (e) {
-    error.value = e?.response?.data?.message || 'تعذر حفظ تقييم الشركة النهائي.'
-  } finally {
-    savingEvaluationId.value = null
   }
 }
 

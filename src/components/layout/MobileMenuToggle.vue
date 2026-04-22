@@ -112,6 +112,8 @@ const menuSections = computed(() => {
         items: [
           { path: '/supervisor/dashboard', icon: 'bi bi-grid', label: 'dashboard' },
           { path: '/supervisor/students', icon: 'bi bi-people', label: 'students' },
+          { path: '/supervisor/applications', icon: 'bi bi-file-earmark-check', label: 'applications' },
+          { path: '/supervisor/jisr-reviews', icon: 'bi bi-clipboard-check', label: 'jisr_reviews' },
           { path: '/supervisor/weekly-tasks', icon: 'bi bi-bar-chart-steps', label: 'weekly_tasks' },
           { path: '/notifications', icon: 'bi bi-bell', label: 'notifications' }
         ]

@@ -58,7 +58,7 @@
 
       <div class="d-flex gap-2 flex-wrap">
         <button
-          v-if="!activeApplication.training_completed_at && !activeApplication.training_ended"
+          v-if="activeApplication.board_url"
           class="btn btn-primary rounded-pill px-4"
           @click="openBoard(activeApplication.board_url)"
         >
@@ -102,9 +102,6 @@ const loadWorkspace = async () => {
   try {
     const res = await studentAPI.getWorkspace()
     activeApplication.value = res.data?.data?.active_application || null
-    if (activeApplication.value?.complete_url) {
-      window.location.href = activeApplication.value.complete_url
-    }
   } catch (e) {
     error.value = e?.response?.data?.message || 'Failed to load workspace'
   } finally {

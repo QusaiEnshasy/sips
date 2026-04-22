@@ -115,7 +115,7 @@ const routes = [
   {
     path: '/supervisor/applications',
     name: 'SupervisorApplications',
-    component: () => import('@/views/supervisor/Students.vue'),
+    component: () => import('@/views/supervisor/Applications.vue'),
     meta: { requiresAuth: true, role: 'supervisor' }
   },
   {

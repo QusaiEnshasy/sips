@@ -148,7 +148,7 @@
                 </div>
 
                 <div class="actions-row">
-                  <button class="btn-review" @click="openReview(submission, 'accepted')">
+                  <button v-if="submission.status !== 'accepted'" class="btn-review" @click="openReview(submission, 'accepted')">
                     <i class="bi bi-check-circle"></i>
                     {{ t('approve_task') }}
                   </button>
